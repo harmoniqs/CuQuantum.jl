@@ -36,23 +36,23 @@ function build_system_gpu(M::Int, d::Int)
     kerr_single = n_single * (n_single - qeye(d))
 
     function embed(op, mode)
-        ops = [i == mode ? op : qeye(d) for i in 1:M]
+        ops = [i == mode ? op : qeye(d) for i = 1:M]
         return tensor(ops...)
     end
 
     # Build on CPU first, then convert to GPU
-    a_cpu = [embed(a_single, m) for m in 1:M]
-    n_cpu = [embed(n_single, m) for m in 1:M]
+    a_cpu = [embed(a_single, m) for m = 1:M]
+    n_cpu = [embed(n_single, m) for m = 1:M]
 
-    H_cpu = sum(chi * embed(kerr_single, m) for m in 1:M)
-    for n in 1:M, m in 1:M
+    H_cpu = sum(chi * embed(kerr_single, m) for m = 1:M)
+    for n = 1:M, m = 1:M
         n == m && continue
         H_cpu += kappa0 * (a_cpu[n]' * a_cpu[m])
     end
 
-    c_ops_cpu = [sqrt(gamma) * a_cpu[m] for m in 1:M]
+    c_ops_cpu = [sqrt(gamma) * a_cpu[m] for m = 1:M]
 
-    fock_list = [m == 1 ? fock(d, 1) : fock(d, 0) for m in 1:M]
+    fock_list = [m == 1 ? fock(d, 1) : fock(d, 0) for m = 1:M]
     psi0_cpu = tensor(fock_list...)
     rho0_cpu = ket2dm(psi0_cpu)
 
@@ -60,7 +60,7 @@ function build_system_gpu(M::Int, d::Int)
     H_gpu = cu(H_cpu)
     c_ops_gpu = [cu(c) for c in c_ops_cpu]
     rho0_gpu = cu(rho0_cpu)
-    e_ops_gpu = [cu(a_cpu[m]' * a_cpu[m]) for m in 1:M]
+    e_ops_gpu = [cu(a_cpu[m]' * a_cpu[m]) for m = 1:M]
 
     return H_gpu, c_ops_gpu, rho0_gpu, e_ops_gpu
 end
@@ -80,15 +80,14 @@ function bench_mesolve_gpu(M::Int, d::Int; n_steps::Int = 100, dt::Float64 = 0.0
 
     H, c_ops, rho0, e_ops = build_system_gpu(M, d)
 
-    options = Dict(
-        :abstol => 1e-8,
-        :reltol => 1e-6,
-        :save_everystep => false,
-    )
+    options = Dict(:abstol => 1e-8, :reltol => 1e-6, :save_everystep => false)
 
     # Warmup (JIT + GPU kernel compilation)
     _ = mesolve(
-        H, rho0, range(0, 0.02, length = 3), c_ops;
+        H,
+        rho0,
+        range(0, 0.02, length = 3),
+        c_ops;
         e_ops = e_ops,
         alg = DP5(),
         progress_bar = Val(false),
@@ -101,7 +100,10 @@ function bench_mesolve_gpu(M::Int, d::Int; n_steps::Int = 100, dt::Float64 = 0.0
     CUDA.synchronize()
     t_start = time_ns()
     sol = mesolve(
-        H, rho0, tlist, c_ops;
+        H,
+        rho0,
+        tlist,
+        c_ops;
         e_ops = e_ops,
         alg = DP5(),
         progress_bar = Val(false),
@@ -111,7 +113,7 @@ function bench_mesolve_gpu(M::Int, d::Int; n_steps::Int = 100, dt::Float64 = 0.0
     t_end = time_ns()
     wall_time = (t_end - t_start) / 1e9
 
-    final_pops = [real(sol.expect[m, end]) for m in 1:M]
+    final_pops = [real(sol.expect[m, end]) for m = 1:M]
     return wall_time, final_pops
 end
 
@@ -131,23 +133,23 @@ function bench_single_action_gpu(M::Int, d::Int; n_warmup::Int = 5, n_trials::In
     kerr_single = n_single * (n_single - qeye(d))
 
     function embed(op, mode)
-        ops = [i == mode ? op : qeye(d) for i in 1:M]
+        ops = [i == mode ? op : qeye(d) for i = 1:M]
         return tensor(ops...)
     end
 
-    a_ops = [embed(a_single, m) for m in 1:M]
-    H = sum(chi * embed(kerr_single, m) for m in 1:M)
-    for n in 1:M, m in 1:M
+    a_ops = [embed(a_single, m) for m = 1:M]
+    H = sum(chi * embed(kerr_single, m) for m = 1:M)
+    for n = 1:M, m = 1:M
         n == m && continue
         H += kappa0 * (a_ops[n]' * a_ops[m])
     end
-    c_ops = [sqrt(gamma) * a_ops[m] for m in 1:M]
+    c_ops = [sqrt(gamma) * a_ops[m] for m = 1:M]
 
     # Build Liouvillian on CPU, convert to GPU sparse
     L_cpu = liouvillian(H, c_ops)
     L_gpu = cu(L_cpu)
 
-    fock_list = [m == 1 ? fock(d, 1) : fock(d, 0) for m in 1:M]
+    fock_list = [m == 1 ? fock(d, 1) : fock(d, 0) for m = 1:M]
     psi0 = tensor(fock_list...)
     rho0 = ket2dm(psi0)
     rho_vec = cu(operator_to_vector(rho0))
@@ -156,14 +158,14 @@ function bench_single_action_gpu(M::Int, d::Int; n_warmup::Int = 5, n_trials::In
     rho_data = rho_vec.data
 
     # Warmup
-    for _ in 1:n_warmup
+    for _ = 1:n_warmup
         out = L_data * rho_data
     end
     CUDA.synchronize()
 
     # Timed runs
     times = Float64[]
-    for _ in 1:n_trials
+    for _ = 1:n_trials
         CUDA.synchronize()
         t0 = time_ns()
         out = L_data * rho_data
@@ -201,7 +203,10 @@ function main()
         else
             @printf(
                 "Skipping M=%d (D=%d): estimated GPU memory ~%.1f GB, free=%.1f GB\n",
-                M_try, D_try, mem_est / 1e9, free / 1e9
+                M_try,
+                D_try,
+                mem_est / 1e9,
+                free / 1e9
             )
         end
     end
