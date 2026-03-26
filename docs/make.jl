@@ -19,9 +19,7 @@ makedocs(;
             "Callbacks" => "concepts/callbacks.md",
             "States" => "concepts/states.md",
         ],
-        "API Reference" => [
-            "CuDensityMat" => "api/cudensitymat.md",
-        ],
+        "API Reference" => ["CuDensityMat" => "api/cudensitymat.md"],
         "Benchmarks" => "benchmarks.md",
     ],
 )
