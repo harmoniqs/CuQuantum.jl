@@ -5,28 +5,28 @@ using CEnum: @cenum
 # --- Status codes ---
 
 @cenum cudensitymatStatus_t::Int32 begin
-    CUDENSITYMAT_STATUS_SUCCESS                  = 0
-    CUDENSITYMAT_STATUS_NOT_INITIALIZED          = 1
-    CUDENSITYMAT_STATUS_ALLOC_FAILED             = 3
-    CUDENSITYMAT_STATUS_INVALID_VALUE            = 7
-    CUDENSITYMAT_STATUS_ARCH_MISMATCH            = 8
-    CUDENSITYMAT_STATUS_EXECUTION_FAILED         = 13
-    CUDENSITYMAT_STATUS_INTERNAL_ERROR           = 14
-    CUDENSITYMAT_STATUS_NOT_SUPPORTED            = 15
-    CUDENSITYMAT_STATUS_CALLBACK_ERROR           = 16
-    CUDENSITYMAT_STATUS_CUBLAS_ERROR             = 17
-    CUDENSITYMAT_STATUS_CUDA_ERROR               = 18
-    CUDENSITYMAT_STATUS_INSUFFICIENT_WORKSPACE   = 19
-    CUDENSITYMAT_STATUS_INSUFFICIENT_DRIVER      = 20
-    CUDENSITYMAT_STATUS_IO_ERROR                 = 21
+    CUDENSITYMAT_STATUS_SUCCESS = 0
+    CUDENSITYMAT_STATUS_NOT_INITIALIZED = 1
+    CUDENSITYMAT_STATUS_ALLOC_FAILED = 3
+    CUDENSITYMAT_STATUS_INVALID_VALUE = 7
+    CUDENSITYMAT_STATUS_ARCH_MISMATCH = 8
+    CUDENSITYMAT_STATUS_EXECUTION_FAILED = 13
+    CUDENSITYMAT_STATUS_INTERNAL_ERROR = 14
+    CUDENSITYMAT_STATUS_NOT_SUPPORTED = 15
+    CUDENSITYMAT_STATUS_CALLBACK_ERROR = 16
+    CUDENSITYMAT_STATUS_CUBLAS_ERROR = 17
+    CUDENSITYMAT_STATUS_CUDA_ERROR = 18
+    CUDENSITYMAT_STATUS_INSUFFICIENT_WORKSPACE = 19
+    CUDENSITYMAT_STATUS_INSUFFICIENT_DRIVER = 20
+    CUDENSITYMAT_STATUS_IO_ERROR = 21
     CUDENSITYMAT_STATUS_CUTENSOR_VERSION_MISMATCH = 22
-    CUDENSITYMAT_STATUS_NO_DEVICE_ALLOCATOR      = 23
-    CUDENSITYMAT_STATUS_CUTENSOR_ERROR           = 24
-    CUDENSITYMAT_STATUS_CUSOLVER_ERROR           = 25
-    CUDENSITYMAT_STATUS_DEVICE_ALLOCATOR_ERROR   = 26
-    CUDENSITYMAT_STATUS_DISTRIBUTED_FAILURE      = 27
-    CUDENSITYMAT_STATUS_INTERRUPTED              = 28
-    CUDENSITYMAT_STATUS_CUTENSORNET_ERROR        = 29
+    CUDENSITYMAT_STATUS_NO_DEVICE_ALLOCATOR = 23
+    CUDENSITYMAT_STATUS_CUTENSOR_ERROR = 24
+    CUDENSITYMAT_STATUS_CUSOLVER_ERROR = 25
+    CUDENSITYMAT_STATUS_DEVICE_ALLOCATOR_ERROR = 26
+    CUDENSITYMAT_STATUS_DISTRIBUTED_FAILURE = 27
+    CUDENSITYMAT_STATUS_INTERRUPTED = 28
+    CUDENSITYMAT_STATUS_CUTENSORNET_ERROR = 29
 end
 
 # --- Compute type ---
@@ -40,7 +40,7 @@ end
 
 @cenum cudensitymatDistributedProvider_t::Int32 begin
     CUDENSITYMAT_DISTRIBUTED_PROVIDER_NONE = 0
-    CUDENSITYMAT_DISTRIBUTED_PROVIDER_MPI  = 1
+    CUDENSITYMAT_DISTRIBUTED_PROVIDER_MPI = 1
     CUDENSITYMAT_DISTRIBUTED_PROVIDER_NCCL = 2
 end
 
@@ -61,7 +61,7 @@ end
 
 @cenum cudensitymatMemspace_t::Int32 begin
     CUDENSITYMAT_MEMSPACE_DEVICE = 0
-    CUDENSITYMAT_MEMSPACE_HOST   = 1
+    CUDENSITYMAT_MEMSPACE_HOST = 1
 end
 
 # --- Workspace kind ---
@@ -73,31 +73,31 @@ end
 # --- State purity ---
 
 @cenum cudensitymatStatePurity_t::Int32 begin
-    CUDENSITYMAT_STATE_PURITY_PURE  = 0
+    CUDENSITYMAT_STATE_PURITY_PURE = 0
     CUDENSITYMAT_STATE_PURITY_MIXED = 1
 end
 
 # --- Elementary operator sparsity ---
 
 @cenum cudensitymatElementaryOperatorSparsity_t::Int32 begin
-    CUDENSITYMAT_OPERATOR_SPARSITY_NONE           = 0
-    CUDENSITYMAT_OPERATOR_SPARSITY_MULTIDIAGONAL  = 1
+    CUDENSITYMAT_OPERATOR_SPARSITY_NONE = 0
+    CUDENSITYMAT_OPERATOR_SPARSITY_MULTIDIAGONAL = 1
 end
 
 # --- Operator spectrum kind ---
 
 @cenum cudensitymatOperatorSpectrumKind_t::Int32 begin
-    CUDENSITYMAT_OPERATOR_SPECTRUM_LARGEST       = 0
-    CUDENSITYMAT_OPERATOR_SPECTRUM_SMALLEST      = 1
-    CUDENSITYMAT_OPERATOR_SPECTRUM_LARGEST_REAL   = 2
-    CUDENSITYMAT_OPERATOR_SPECTRUM_SMALLEST_REAL  = 3
+    CUDENSITYMAT_OPERATOR_SPECTRUM_LARGEST = 0
+    CUDENSITYMAT_OPERATOR_SPECTRUM_SMALLEST = 1
+    CUDENSITYMAT_OPERATOR_SPECTRUM_LARGEST_REAL = 2
+    CUDENSITYMAT_OPERATOR_SPECTRUM_SMALLEST_REAL = 3
 end
 
 # --- Operator spectrum config ---
 
 @cenum cudensitymatOperatorSpectrumConfig_t::Int32 begin
-    CUDENSITYMAT_OPERATOR_SPECTRUM_CONFIG_MAX_EXPANSION  = 0
-    CUDENSITYMAT_OPERATOR_SPECTRUM_CONFIG_MAX_RESTARTS   = 1
+    CUDENSITYMAT_OPERATOR_SPECTRUM_CONFIG_MAX_EXPANSION = 0
+    CUDENSITYMAT_OPERATOR_SPECTRUM_CONFIG_MAX_RESTARTS = 1
     CUDENSITYMAT_OPERATOR_SPECTRUM_CONFIG_MIN_BLOCK_SIZE = 2
 end
 
@@ -105,16 +105,16 @@ end
 # All opaque handles are void* in C, represented as Ptr{Cvoid} in Julia.
 # We define type aliases for clarity and type safety.
 
-const cudensitymatHandle_t              = Ptr{Cvoid}
+const cudensitymatHandle_t = Ptr{Cvoid}
 const cudensitymatWorkspaceDescriptor_t = Ptr{Cvoid}
-const cudensitymatState_t               = Ptr{Cvoid}
-const cudensitymatElementaryOperator_t  = Ptr{Cvoid}
-const cudensitymatMatrixOperator_t      = Ptr{Cvoid}
-const cudensitymatOperatorTerm_t        = Ptr{Cvoid}
-const cudensitymatOperator_t            = Ptr{Cvoid}
-const cudensitymatOperatorAction_t      = Ptr{Cvoid}
-const cudensitymatExpectation_t         = Ptr{Cvoid}
-const cudensitymatOperatorSpectrum_t    = Ptr{Cvoid}
+const cudensitymatState_t = Ptr{Cvoid}
+const cudensitymatElementaryOperator_t = Ptr{Cvoid}
+const cudensitymatMatrixOperator_t = Ptr{Cvoid}
+const cudensitymatOperatorTerm_t = Ptr{Cvoid}
+const cudensitymatOperator_t = Ptr{Cvoid}
+const cudensitymatOperatorAction_t = Ptr{Cvoid}
+const cudensitymatExpectation_t = Ptr{Cvoid}
+const cudensitymatOperatorSpectrum_t = Ptr{Cvoid}
 
 # --- Distributed communicator struct ---
 

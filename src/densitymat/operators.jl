@@ -14,16 +14,22 @@ export OperatorAction, create_operator_action, destroy_operator_action
 # No-callback sentinel (null callback structs)
 # =============================================================================
 
-const NULL_TENSOR_CALLBACK = cudensitymatWrappedTensorCallback_t(
-    C_NULL, CUDENSITYMAT_CALLBACK_DEVICE_CPU, C_NULL)
+const NULL_TENSOR_CALLBACK =
+    cudensitymatWrappedTensorCallback_t(C_NULL, CUDENSITYMAT_CALLBACK_DEVICE_CPU, C_NULL)
 const NULL_TENSOR_GRADIENT_CALLBACK = cudensitymatWrappedTensorGradientCallback_t(
-    C_NULL, CUDENSITYMAT_CALLBACK_DEVICE_CPU, C_NULL,
-    CUDENSITYMAT_DIFFERENTIATION_DIR_BACKWARD)
-const NULL_SCALAR_CALLBACK = cudensitymatWrappedScalarCallback_t(
-    C_NULL, CUDENSITYMAT_CALLBACK_DEVICE_CPU, C_NULL)
+    C_NULL,
+    CUDENSITYMAT_CALLBACK_DEVICE_CPU,
+    C_NULL,
+    CUDENSITYMAT_DIFFERENTIATION_DIR_BACKWARD,
+)
+const NULL_SCALAR_CALLBACK =
+    cudensitymatWrappedScalarCallback_t(C_NULL, CUDENSITYMAT_CALLBACK_DEVICE_CPU, C_NULL)
 const NULL_SCALAR_GRADIENT_CALLBACK = cudensitymatWrappedScalarGradientCallback_t(
-    C_NULL, CUDENSITYMAT_CALLBACK_DEVICE_CPU, C_NULL,
-    CUDENSITYMAT_DIFFERENTIATION_DIR_BACKWARD)
+    C_NULL,
+    CUDENSITYMAT_CALLBACK_DEVICE_CPU,
+    C_NULL,
+    CUDENSITYMAT_DIFFERENTIATION_DIR_BACKWARD,
+)
 
 # =============================================================================
 # Workspace memory limit helper
@@ -35,7 +41,7 @@ const NULL_SCALAR_GRADIENT_CALLBACK = cudensitymatWrappedScalarGradientCallback_
 Return the workspace size limit in bytes. If `user_limit` is `nothing`,
 returns `ws.memory_limit` if set, or 80% of free GPU memory.
 """
-function _get_workspace_limit(ws::WorkStream, user_limit::Union{Nothing, Integer})
+function _get_workspace_limit(ws::WorkStream, user_limit::Union{Nothing,Integer})
     if user_limit !== nothing
         return Int(user_limit)
     end
@@ -66,8 +72,12 @@ mutable struct ElementaryOperator
     _data_ref::Any
     _callback_refs::Any
 
-    function ElementaryOperator(handle::cudensitymatElementaryOperator_t, ws::WorkStream;
-                                data_ref=nothing, callback_refs=nothing)
+    function ElementaryOperator(
+        handle::cudensitymatElementaryOperator_t,
+        ws::WorkStream;
+        data_ref = nothing,
+        callback_refs = nothing,
+    )
         obj = new(handle, ws, data_ref, callback_refs)
         finalizer(obj) do x
             if x.handle != C_NULL
@@ -99,16 +109,17 @@ function create_elementary_operator(
     ws::WorkStream,
     space_mode_extents::AbstractVector{<:Integer},
     data::CUDA.CuArray{T};
-    sparsity::Symbol=:none,
-    diagonal_offsets::AbstractVector{<:Integer}=Int32[],
-    tensor_callback::cudensitymatWrappedTensorCallback_t=NULL_TENSOR_CALLBACK,
-    tensor_gradient_callback::cudensitymatWrappedTensorGradientCallback_t=NULL_TENSOR_GRADIENT_CALLBACK,
-) where T
+    sparsity::Symbol = :none,
+    diagonal_offsets::AbstractVector{<:Integer} = Int32[],
+    tensor_callback::cudensitymatWrappedTensorCallback_t = NULL_TENSOR_CALLBACK,
+    tensor_gradient_callback::cudensitymatWrappedTensorGradientCallback_t = NULL_TENSOR_GRADIENT_CALLBACK,
+) where {T}
     _check_valid(ws)
 
-    sp = sparsity == :none ? CUDENSITYMAT_OPERATOR_SPARSITY_NONE :
-         sparsity == :multidiagonal ? CUDENSITYMAT_OPERATOR_SPARSITY_MULTIDIAGONAL :
-         error("Unknown sparsity: $sparsity")
+    sp =
+        sparsity == :none ? CUDENSITYMAT_OPERATOR_SPARSITY_NONE :
+        sparsity == :multidiagonal ? CUDENSITYMAT_OPERATOR_SPARSITY_MULTIDIAGONAL :
+        error("Unknown sparsity: $sparsity")
 
     extents = Int64[e for e in space_mode_extents]
     offsets = Int32[o for o in diagonal_offsets]
@@ -126,10 +137,10 @@ function create_elementary_operator(
         pointer(data),
         tensor_callback,
         tensor_gradient_callback,
-        op_ref
+        op_ref,
     )
 
-    return ElementaryOperator(op_ref[], ws; data_ref=data)
+    return ElementaryOperator(op_ref[], ws; data_ref = data)
 end
 
 """
@@ -143,16 +154,17 @@ function create_elementary_operator_batch(
     space_mode_extents::AbstractVector{<:Integer},
     data::CUDA.CuArray{T},
     batch_size::Integer;
-    sparsity::Symbol=:none,
-    diagonal_offsets::AbstractVector{<:Integer}=Int32[],
-    tensor_callback::cudensitymatWrappedTensorCallback_t=NULL_TENSOR_CALLBACK,
-    tensor_gradient_callback::cudensitymatWrappedTensorGradientCallback_t=NULL_TENSOR_GRADIENT_CALLBACK,
-) where T
+    sparsity::Symbol = :none,
+    diagonal_offsets::AbstractVector{<:Integer} = Int32[],
+    tensor_callback::cudensitymatWrappedTensorCallback_t = NULL_TENSOR_CALLBACK,
+    tensor_gradient_callback::cudensitymatWrappedTensorGradientCallback_t = NULL_TENSOR_GRADIENT_CALLBACK,
+) where {T}
     _check_valid(ws)
 
-    sp = sparsity == :none ? CUDENSITYMAT_OPERATOR_SPARSITY_NONE :
-         sparsity == :multidiagonal ? CUDENSITYMAT_OPERATOR_SPARSITY_MULTIDIAGONAL :
-         error("Unknown sparsity: $sparsity")
+    sp =
+        sparsity == :none ? CUDENSITYMAT_OPERATOR_SPARSITY_NONE :
+        sparsity == :multidiagonal ? CUDENSITYMAT_OPERATOR_SPARSITY_MULTIDIAGONAL :
+        error("Unknown sparsity: $sparsity")
 
     extents = Int64[e for e in space_mode_extents]
     offsets = Int32[o for o in diagonal_offsets]
@@ -171,10 +183,10 @@ function create_elementary_operator_batch(
         pointer(data),
         tensor_callback,
         tensor_gradient_callback,
-        op_ref
+        op_ref,
     )
 
-    return ElementaryOperator(op_ref[], ws; data_ref=data)
+    return ElementaryOperator(op_ref[], ws; data_ref = data)
 end
 
 function destroy_elementary_operator(op::ElementaryOperator)
@@ -200,8 +212,12 @@ mutable struct MatrixOperator
     _data_ref::Any
     _callback_refs::Any
 
-    function MatrixOperator(handle::cudensitymatMatrixOperator_t, ws::WorkStream;
-                            data_ref=nothing, callback_refs=nothing)
+    function MatrixOperator(
+        handle::cudensitymatMatrixOperator_t,
+        ws::WorkStream;
+        data_ref = nothing,
+        callback_refs = nothing,
+    )
         obj = new(handle, ws, data_ref, callback_refs)
         finalizer(obj) do x
             if x.handle != C_NULL
@@ -225,9 +241,9 @@ function create_matrix_operator(
     ws::WorkStream,
     space_mode_extents::AbstractVector{<:Integer},
     data::CUDA.CuArray{T};
-    tensor_callback::cudensitymatWrappedTensorCallback_t=NULL_TENSOR_CALLBACK,
-    tensor_gradient_callback::cudensitymatWrappedTensorGradientCallback_t=NULL_TENSOR_GRADIENT_CALLBACK,
-) where T
+    tensor_callback::cudensitymatWrappedTensorCallback_t = NULL_TENSOR_CALLBACK,
+    tensor_gradient_callback::cudensitymatWrappedTensorGradientCallback_t = NULL_TENSOR_GRADIENT_CALLBACK,
+) where {T}
     _check_valid(ws)
     extents = Int64[e for e in space_mode_extents]
 
@@ -240,10 +256,10 @@ function create_matrix_operator(
         pointer(data),
         tensor_callback,
         tensor_gradient_callback,
-        op_ref
+        op_ref,
     )
 
-    return MatrixOperator(op_ref[], ws; data_ref=data)
+    return MatrixOperator(op_ref[], ws; data_ref = data)
 end
 
 """
@@ -257,9 +273,9 @@ function create_matrix_operator_batch(
     space_mode_extents::AbstractVector{<:Integer},
     data::CUDA.CuArray{T},
     batch_size::Integer;
-    tensor_callback::cudensitymatWrappedTensorCallback_t=NULL_TENSOR_CALLBACK,
-    tensor_gradient_callback::cudensitymatWrappedTensorGradientCallback_t=NULL_TENSOR_GRADIENT_CALLBACK,
-) where T
+    tensor_callback::cudensitymatWrappedTensorCallback_t = NULL_TENSOR_CALLBACK,
+    tensor_gradient_callback::cudensitymatWrappedTensorGradientCallback_t = NULL_TENSOR_GRADIENT_CALLBACK,
+) where {T}
     _check_valid(ws)
     extents = Int64[e for e in space_mode_extents]
 
@@ -273,10 +289,10 @@ function create_matrix_operator_batch(
         pointer(data),
         tensor_callback,
         tensor_gradient_callback,
-        op_ref
+        op_ref,
     )
 
-    return MatrixOperator(op_ref[], ws; data_ref=data)
+    return MatrixOperator(op_ref[], ws; data_ref = data)
 end
 
 function destroy_matrix_operator(op::MatrixOperator)
@@ -305,8 +321,11 @@ mutable struct OperatorTerm
     _matrix_op_refs::Vector{Any}
     _callback_refs::Vector{Any}
 
-    function OperatorTerm(handle::cudensitymatOperatorTerm_t, ws::WorkStream,
-                          dims::Vector{Int64})
+    function OperatorTerm(
+        handle::cudensitymatOperatorTerm_t,
+        ws::WorkStream,
+        dims::Vector{Int64},
+    )
         obj = new(handle, ws, dims, Any[], Any[], Any[])
         finalizer(obj) do x
             if x.handle != C_NULL
@@ -350,9 +369,9 @@ function append_elementary_product!(
     elem_operators::AbstractVector{ElementaryOperator},
     modes_acted_on::AbstractVector{<:Integer},
     mode_action_duality::AbstractVector{<:Integer};
-    coefficient::Number=ComplexF64(1.0),
-    coefficient_callback::cudensitymatWrappedScalarCallback_t=NULL_SCALAR_CALLBACK,
-    coefficient_gradient_callback::cudensitymatWrappedScalarGradientCallback_t=NULL_SCALAR_GRADIENT_CALLBACK,
+    coefficient::Number = ComplexF64(1.0),
+    coefficient_callback::cudensitymatWrappedScalarCallback_t = NULL_SCALAR_CALLBACK,
+    coefficient_gradient_callback::cudensitymatWrappedScalarGradientCallback_t = NULL_SCALAR_GRADIENT_CALLBACK,
 )
     handles = cudensitymatElementaryOperator_t[op.handle for op in elem_operators]
     modes = Int32[m for m in modes_acted_on]
@@ -367,7 +386,7 @@ function append_elementary_product!(
         duality,
         ComplexF64(coefficient),
         coefficient_callback,
-        coefficient_gradient_callback
+        coefficient_gradient_callback,
     )
 
     # Keep references
@@ -392,9 +411,9 @@ function append_elementary_product_batch!(
     mode_action_duality::AbstractVector{<:Integer},
     batch_size::Integer,
     static_coefficients::CUDA.CuVector{ComplexF64};
-    total_coefficients::Union{Nothing, CUDA.CuVector{ComplexF64}}=nothing,
-    coefficient_callback::cudensitymatWrappedScalarCallback_t=NULL_SCALAR_CALLBACK,
-    coefficient_gradient_callback::cudensitymatWrappedScalarGradientCallback_t=NULL_SCALAR_GRADIENT_CALLBACK,
+    total_coefficients::Union{Nothing,CUDA.CuVector{ComplexF64}} = nothing,
+    coefficient_callback::cudensitymatWrappedScalarCallback_t = NULL_SCALAR_CALLBACK,
+    coefficient_gradient_callback::cudensitymatWrappedScalarGradientCallback_t = NULL_SCALAR_GRADIENT_CALLBACK,
 )
     handles = cudensitymatElementaryOperator_t[op.handle for op in elem_operators]
     modes = Int32[m for m in modes_acted_on]
@@ -412,7 +431,7 @@ function append_elementary_product_batch!(
         pointer(static_coefficients),
         total_ptr,
         coefficient_callback,
-        coefficient_gradient_callback
+        coefficient_gradient_callback,
     )
 
     append!(term._elem_op_refs, elem_operators)
@@ -436,9 +455,9 @@ function append_matrix_product!(
     matrix_operators::AbstractVector{MatrixOperator},
     conjugations::AbstractVector{<:Integer},
     action_duality::AbstractVector{<:Integer};
-    coefficient::Number=ComplexF64(1.0),
-    coefficient_callback::cudensitymatWrappedScalarCallback_t=NULL_SCALAR_CALLBACK,
-    coefficient_gradient_callback::cudensitymatWrappedScalarGradientCallback_t=NULL_SCALAR_GRADIENT_CALLBACK,
+    coefficient::Number = ComplexF64(1.0),
+    coefficient_callback::cudensitymatWrappedScalarCallback_t = NULL_SCALAR_CALLBACK,
+    coefficient_gradient_callback::cudensitymatWrappedScalarGradientCallback_t = NULL_SCALAR_GRADIENT_CALLBACK,
 )
     handles = cudensitymatMatrixOperator_t[op.handle for op in matrix_operators]
     conj = Int32[c for c in conjugations]
@@ -453,7 +472,7 @@ function append_matrix_product!(
         dual,
         ComplexF64(coefficient),
         coefficient_callback,
-        coefficient_gradient_callback
+        coefficient_gradient_callback,
     )
 
     append!(term._matrix_op_refs, matrix_operators)
@@ -519,11 +538,14 @@ Append an operator term to the composite operator.
 - `duality`: 0 for ket-side (default), nonzero for bra-side
 - `coefficient`: Static complex scalar coefficient (default: 1.0+0im)
 """
-function append_term!(op::Operator, term::OperatorTerm;
-                      duality::Integer=0,
-                      coefficient::Number=ComplexF64(1.0),
-                      coefficient_callback::cudensitymatWrappedScalarCallback_t=NULL_SCALAR_CALLBACK,
-                      coefficient_gradient_callback::cudensitymatWrappedScalarGradientCallback_t=NULL_SCALAR_GRADIENT_CALLBACK)
+function append_term!(
+    op::Operator,
+    term::OperatorTerm;
+    duality::Integer = 0,
+    coefficient::Number = ComplexF64(1.0),
+    coefficient_callback::cudensitymatWrappedScalarCallback_t = NULL_SCALAR_CALLBACK,
+    coefficient_gradient_callback::cudensitymatWrappedScalarGradientCallback_t = NULL_SCALAR_GRADIENT_CALLBACK,
+)
     cudensitymatOperatorAppendTerm(
         op.ws.handle,
         op.handle,
@@ -531,7 +553,7 @@ function append_term!(op::Operator, term::OperatorTerm;
         Int32(duality),
         ComplexF64(coefficient),
         coefficient_callback,
-        coefficient_gradient_callback
+        coefficient_gradient_callback,
     )
     push!(op._term_refs, (term, coefficient))
     return nothing
@@ -547,13 +569,16 @@ Append a batched operator term.
 - `static_coefficients`: GPU array of ComplexF64 coefficients (length batch_size)
 - `total_coefficients`: GPU storage for total coefficients, or `nothing`
 """
-function append_term_batch!(op::Operator, term::OperatorTerm,
-                            batch_size::Integer,
-                            static_coefficients::CUDA.CuVector{ComplexF64};
-                            duality::Integer=0,
-                            total_coefficients::Union{Nothing, CUDA.CuVector{ComplexF64}}=nothing,
-                            coefficient_callback::cudensitymatWrappedScalarCallback_t=NULL_SCALAR_CALLBACK,
-                            coefficient_gradient_callback::cudensitymatWrappedScalarGradientCallback_t=NULL_SCALAR_GRADIENT_CALLBACK)
+function append_term_batch!(
+    op::Operator,
+    term::OperatorTerm,
+    batch_size::Integer,
+    static_coefficients::CUDA.CuVector{ComplexF64};
+    duality::Integer = 0,
+    total_coefficients::Union{Nothing,CUDA.CuVector{ComplexF64}} = nothing,
+    coefficient_callback::cudensitymatWrappedScalarCallback_t = NULL_SCALAR_CALLBACK,
+    coefficient_gradient_callback::cudensitymatWrappedScalarGradientCallback_t = NULL_SCALAR_GRADIENT_CALLBACK,
+)
     total_ptr = total_coefficients === nothing ? CUDA.CU_NULL : pointer(total_coefficients)
     cudensitymatOperatorAppendTermBatch(
         op.ws.handle,
@@ -564,7 +589,7 @@ function append_term_batch!(op::Operator, term::OperatorTerm,
         pointer(static_coefficients),
         total_ptr,
         coefficient_callback,
-        coefficient_gradient_callback
+        coefficient_gradient_callback,
     )
     push!(op._term_refs, (term, static_coefficients, batch_size))
     return nothing
@@ -592,8 +617,11 @@ mutable struct OperatorAction
     ws::WorkStream
     _operator_refs::Vector{Operator}
 
-    function OperatorAction(handle::cudensitymatOperatorAction_t, ws::WorkStream,
-                            operators::Vector{Operator})
+    function OperatorAction(
+        handle::cudensitymatOperatorAction_t,
+        ws::WorkStream,
+        operators::Vector{Operator},
+    )
         obj = new(handle, ws, operators)
         finalizer(obj) do x
             if x.handle != C_NULL
@@ -623,8 +651,7 @@ function create_operator_action(ws::WorkStream, operators::Vector{Operator})
     _check_valid(ws)
     handles = cudensitymatOperator_t[op.handle for op in operators]
     action_ref = Ref{cudensitymatOperatorAction_t}()
-    cudensitymatCreateOperatorAction(
-        ws.handle, Int32(length(handles)), handles, action_ref)
+    cudensitymatCreateOperatorAction(ws.handle, Int32(length(handles)), handles, action_ref)
     return OperatorAction(action_ref[], ws, operators)
 end
 
@@ -641,16 +668,21 @@ function prepare_action!(
     action::OperatorAction,
     states_in::AbstractVector{<:AbstractState},
     state_out::AbstractState;
-    compute_type::cudensitymatComputeType_t=CUDENSITYMAT_COMPUTE_64F,
-    workspace_limit::Union{Nothing, Integer}=nothing,
+    compute_type::cudensitymatComputeType_t = CUDENSITYMAT_COMPUTE_64F,
+    workspace_limit::Union{Nothing,Integer} = nothing,
 )
     _check_valid(ws)
     mem_limit = _get_workspace_limit(ws, workspace_limit)
     in_handles = cudensitymatState_t[s.handle for s in states_in]
     cudensitymatOperatorActionPrepare(
-        ws.handle, action.handle, in_handles, state_out.handle,
-        compute_type, Csize_t(mem_limit), ws.workspace,
-        CUDA.stream().handle
+        ws.handle,
+        action.handle,
+        in_handles,
+        state_out.handle,
+        compute_type,
+        Csize_t(mem_limit),
+        ws.workspace,
+        CUDA.stream().handle,
     )
     # Query and allocate workspace
     required = workspace_query_size(ws)
@@ -671,18 +703,25 @@ function compute_action!(
     action::OperatorAction,
     states_in::AbstractVector{<:AbstractState},
     state_out::AbstractState;
-    time::Real=0.0,
-    batch_size::Integer=0,
-    num_params::Integer=0,
-    params::Union{Nothing, CUDA.CuVector{Float64}}=nothing,
+    time::Real = 0.0,
+    batch_size::Integer = 0,
+    num_params::Integer = 0,
+    params::Union{Nothing,CUDA.CuVector{Float64}} = nothing,
 )
     _check_valid(ws)
     in_handles = cudensitymatState_t[s.handle for s in states_in]
     params_ptr = params === nothing ? CUDA.CU_NULL : pointer(params)
     cudensitymatOperatorActionCompute(
-        ws.handle, action.handle, Cdouble(time), Int64(batch_size),
-        Int32(num_params), params_ptr, in_handles, state_out.handle,
-        ws.workspace, CUDA.stream().handle
+        ws.handle,
+        action.handle,
+        Cdouble(time),
+        Int64(batch_size),
+        Int32(num_params),
+        params_ptr,
+        in_handles,
+        state_out.handle,
+        ws.workspace,
+        CUDA.stream().handle,
     )
     CUDA.synchronize()
     return nothing
@@ -705,15 +744,20 @@ function prepare_operator_action!(
     operator::Operator,
     state_in::AbstractState,
     state_out::AbstractState;
-    compute_type::cudensitymatComputeType_t=CUDENSITYMAT_COMPUTE_64F,
-    workspace_limit::Union{Nothing, Integer}=nothing,
+    compute_type::cudensitymatComputeType_t = CUDENSITYMAT_COMPUTE_64F,
+    workspace_limit::Union{Nothing,Integer} = nothing,
 )
     _check_valid(ws)
     mem_limit = _get_workspace_limit(ws, workspace_limit)
     cudensitymatOperatorPrepareAction(
-        ws.handle, operator.handle, state_in.handle, state_out.handle,
-        compute_type, Csize_t(mem_limit), ws.workspace,
-        CUDA.stream().handle
+        ws.handle,
+        operator.handle,
+        state_in.handle,
+        state_out.handle,
+        compute_type,
+        Csize_t(mem_limit),
+        ws.workspace,
+        CUDA.stream().handle,
     )
     required = workspace_query_size(ws)
     if required > 0
@@ -733,17 +777,24 @@ function compute_operator_action!(
     operator::Operator,
     state_in::AbstractState,
     state_out::AbstractState;
-    time::Real=0.0,
-    batch_size::Integer=0,
-    num_params::Integer=0,
-    params::Union{Nothing, CUDA.CuVector{Float64}}=nothing,
+    time::Real = 0.0,
+    batch_size::Integer = 0,
+    num_params::Integer = 0,
+    params::Union{Nothing,CUDA.CuVector{Float64}} = nothing,
 )
     _check_valid(ws)
     params_ptr = params === nothing ? CUDA.CU_NULL : pointer(params)
     cudensitymatOperatorComputeAction(
-        ws.handle, operator.handle, Cdouble(time), Int64(batch_size),
-        Int32(num_params), params_ptr, state_in.handle, state_out.handle,
-        ws.workspace, CUDA.stream().handle
+        ws.handle,
+        operator.handle,
+        Cdouble(time),
+        Int64(batch_size),
+        Int32(num_params),
+        params_ptr,
+        state_in.handle,
+        state_out.handle,
+        ws.workspace,
+        CUDA.stream().handle,
     )
     CUDA.synchronize()
     return nothing
@@ -768,15 +819,20 @@ function prepare_operator_action_backward!(
     operator::Operator,
     state_in::AbstractState,
     state_out_adj::AbstractState;
-    compute_type::cudensitymatComputeType_t=CUDENSITYMAT_COMPUTE_64F,
-    workspace_limit::Union{Nothing, Integer}=nothing,
+    compute_type::cudensitymatComputeType_t = CUDENSITYMAT_COMPUTE_64F,
+    workspace_limit::Union{Nothing,Integer} = nothing,
 )
     _check_valid(ws)
     mem_limit = _get_workspace_limit(ws, workspace_limit)
     cudensitymatOperatorPrepareActionBackwardDiff(
-        ws.handle, operator.handle, state_in.handle, state_out_adj.handle,
-        compute_type, Csize_t(mem_limit), ws.workspace,
-        CUDA.stream().handle
+        ws.handle,
+        operator.handle,
+        state_in.handle,
+        state_out_adj.handle,
+        compute_type,
+        Csize_t(mem_limit),
+        ws.workspace,
+        CUDA.stream().handle,
     )
     required = workspace_query_size(ws)
     if required > 0
@@ -808,18 +864,26 @@ function compute_operator_action_backward!(
     state_out_adj::AbstractState,
     state_in_adj::AbstractState,
     params_grad::CUDA.CuVector{Float64};
-    time::Real=0.0,
-    batch_size::Integer=0,
-    num_params::Integer=0,
-    params::Union{Nothing, CUDA.CuVector{Float64}}=nothing,
+    time::Real = 0.0,
+    batch_size::Integer = 0,
+    num_params::Integer = 0,
+    params::Union{Nothing,CUDA.CuVector{Float64}} = nothing,
 )
     _check_valid(ws)
     params_ptr = params === nothing ? CUDA.CU_NULL : pointer(params)
     cudensitymatOperatorComputeActionBackwardDiff(
-        ws.handle, operator.handle, Cdouble(time), Int64(batch_size),
-        Int32(num_params), params_ptr, state_in.handle, state_out_adj.handle,
-        state_in_adj.handle, pointer(params_grad),
-        ws.workspace, CUDA.stream().handle
+        ws.handle,
+        operator.handle,
+        Cdouble(time),
+        Int64(batch_size),
+        Int32(num_params),
+        params_ptr,
+        state_in.handle,
+        state_out_adj.handle,
+        state_in_adj.handle,
+        pointer(params_grad),
+        ws.workspace,
+        CUDA.stream().handle,
     )
     CUDA.synchronize()
     return nothing

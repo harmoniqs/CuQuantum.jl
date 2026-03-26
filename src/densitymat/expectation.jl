@@ -16,7 +16,11 @@ mutable struct Expectation
     ws::WorkStream
     _operator_ref::Operator
 
-    function Expectation(handle::cudensitymatExpectation_t, ws::WorkStream, operator::Operator)
+    function Expectation(
+        handle::cudensitymatExpectation_t,
+        ws::WorkStream,
+        operator::Operator,
+    )
         obj = new(handle, ws, operator)
         finalizer(obj) do x
             if x.handle != C_NULL
@@ -59,15 +63,19 @@ function prepare_expectation!(
     ws::WorkStream,
     expectation::Expectation,
     state::AbstractState;
-    compute_type::cudensitymatComputeType_t=CUDENSITYMAT_COMPUTE_64F,
-    workspace_limit::Union{Nothing, Integer}=nothing,
+    compute_type::cudensitymatComputeType_t = CUDENSITYMAT_COMPUTE_64F,
+    workspace_limit::Union{Nothing,Integer} = nothing,
 )
     _check_valid(ws)
     mem_limit = _get_workspace_limit(ws, workspace_limit)
     cudensitymatExpectationPrepare(
-        ws.handle, expectation.handle, state.handle,
-        compute_type, Csize_t(mem_limit), ws.workspace,
-        CUDA.stream().handle
+        ws.handle,
+        expectation.handle,
+        state.handle,
+        compute_type,
+        Csize_t(mem_limit),
+        ws.workspace,
+        CUDA.stream().handle,
     )
     required = workspace_query_size(ws)
     if required > 0
@@ -91,17 +99,24 @@ function compute_expectation!(
     expectation::Expectation,
     state::AbstractState,
     result::CUDA.CuArray;
-    time::Real=0.0,
-    batch_size::Integer=1,
-    num_params::Integer=0,
-    params::Union{Nothing, CUDA.CuVector{Float64}}=nothing,
+    time::Real = 0.0,
+    batch_size::Integer = 1,
+    num_params::Integer = 0,
+    params::Union{Nothing,CUDA.CuVector{Float64}} = nothing,
 )
     _check_valid(ws)
     params_ptr = params === nothing ? CUDA.CU_NULL : pointer(params)
     cudensitymatExpectationCompute(
-        ws.handle, expectation.handle, Cdouble(time), Int64(batch_size),
-        Int32(num_params), params_ptr, state.handle,
-        pointer(result), ws.workspace, CUDA.stream().handle
+        ws.handle,
+        expectation.handle,
+        Cdouble(time),
+        Int64(batch_size),
+        Int32(num_params),
+        params_ptr,
+        state.handle,
+        pointer(result),
+        ws.workspace,
+        CUDA.stream().handle,
     )
     CUDA.synchronize()
     return nothing

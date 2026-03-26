@@ -33,16 +33,21 @@
                 params_grad[1, b] = 1.0  # placeholder
             end
         end
-        cb, gcb, cb_refs = CuDensityMat.wrap_scalar_callback(td_coeff; gradient=td_grad)
+        cb, gcb, cb_refs = CuDensityMat.wrap_scalar_callback(td_coeff; gradient = td_grad)
 
         operator = CuDensityMat.create_operator(ws, dims)
-        CuDensityMat.append_term!(operator, term;
-            duality=0, coefficient=1.0+0im,
-            coefficient_callback=cb, coefficient_gradient_callback=gcb)
+        CuDensityMat.append_term!(
+            operator,
+            term;
+            duality = 0,
+            coefficient = 1.0+0im,
+            coefficient_callback = cb,
+            coefficient_gradient_callback = gcb,
+        )
 
         # Forward pass states
-        psi_in = DenseMixedState{T}(ws, (2,); batch_size=1)
-        psi_out = DenseMixedState{T}(ws, (2,); batch_size=1)
+        psi_in = DenseMixedState{T}(ws, (2,); batch_size = 1)
+        psi_out = DenseMixedState{T}(ws, (2,); batch_size = 1)
         CuDensityMat.allocate_storage!(psi_in)
         CuDensityMat.allocate_storage!(psi_out)
         copyto!(psi_in.storage, CUDA.CuVector{T}([1.0, 0.0, 0.0, 0.0]))
@@ -51,11 +56,19 @@
         CuDensityMat.prepare_operator_action!(ws, operator, psi_in, psi_out)
         CuDensityMat.initialize_zero!(psi_out)
         params = CUDA.CuVector{Float64}([2.0])
-        CuDensityMat.compute_operator_action!(ws, operator, psi_in, psi_out;
-            time=0.3, batch_size=1, num_params=1, params=params)
+        CuDensityMat.compute_operator_action!(
+            ws,
+            operator,
+            psi_in,
+            psi_out;
+            time = 0.3,
+            batch_size = 1,
+            num_params = 1,
+            params = params,
+        )
 
         # Backward pass states
-        psi_in_adj = DenseMixedState{T}(ws, (2,); batch_size=1)
+        psi_in_adj = DenseMixedState{T}(ws, (2,); batch_size = 1)
         CuDensityMat.allocate_storage!(psi_in_adj)
         params_grad = CUDA.zeros(Float64, 1)
 
@@ -66,9 +79,18 @@
         # Zero adjoint state and param grads, then compute backward
         CuDensityMat.initialize_zero!(psi_in_adj)
         params_grad .= 0.0
-        CuDensityMat.compute_operator_action_backward!(ws, operator,
-            psi_in, psi_out, psi_in_adj, params_grad;
-            time=0.3, batch_size=1, num_params=1, params=params)
+        CuDensityMat.compute_operator_action_backward!(
+            ws,
+            operator,
+            psi_in,
+            psi_out,
+            psi_in_adj,
+            params_grad;
+            time = 0.3,
+            batch_size = 1,
+            num_params = 1,
+            params = params,
+        )
 
         # Check outputs are non-zero
         adj_result = Array(psi_in_adj.storage)

@@ -61,10 +61,8 @@ include("spectrum.jl")
 # --- Handle management ---
 
 # Per-context handle cache following CUDA.jl pattern
-const _handle_cache = HandleCache{CUDA.CuContext, cudensitymatHandle_t}(
-    (_) -> create(),
-    (_, h) -> destroy(h)
-)
+const _handle_cache =
+    HandleCache{CUDA.CuContext,cudensitymatHandle_t}((_) -> create(), (_, h) -> destroy(h))
 
 """
     handle() -> cudensitymatHandle_t
@@ -96,7 +94,8 @@ function __init__()
     global libcudensitymat
     if CUDA.local_toolkit
         local dirs = CUDA_Runtime_Discovery.find_toolkit()
-        local path = CUDA_Runtime_Discovery.get_library(dirs, "cudensitymat"; optional=true)
+        local path =
+            CUDA_Runtime_Discovery.get_library(dirs, "cudensitymat"; optional = true)
         if path === nothing
             precompiling || @error "cuDensityMat is not available on your system"
             return
@@ -104,7 +103,8 @@ function __init__()
         libcudensitymat = path
     else
         if !cuQuantum_jll.is_available()
-            precompiling || @error "cuQuantum is not available for your platform ($(Base.BinaryPlatforms.triplet(cuQuantum_jll.host_platform)))"
+            precompiling ||
+                @error "cuQuantum is not available for your platform ($(Base.BinaryPlatforms.triplet(cuQuantum_jll.host_platform)))"
             return
         end
         libcudensitymat = cuQuantum_jll.libcudensitymat

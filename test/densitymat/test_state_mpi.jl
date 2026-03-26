@@ -21,13 +21,17 @@
             ws = WorkStream()
             comm_ptr = Ptr{Cvoid}(_MPI_mod.API.MPI_Comm_c2f(comm))
             comm_size = sizeof(_MPI_mod.MPI_Comm)
-            CuDensityMat.set_communicator!(ws, :mpi;
-                comm_ptr=comm_ptr, comm_size=comm_size)
+            CuDensityMat.set_communicator!(
+                ws,
+                :mpi;
+                comm_ptr = comm_ptr,
+                comm_size = comm_size,
+            )
 
             for T in [ComplexF64, ComplexF32]
                 for dims in [(2, 2, 2)]
                     for bs in [1, 2]
-                        psi = DensePureState{T}(ws, dims; batch_size=bs)
+                        psi = DensePureState{T}(ws, dims; batch_size = bs)
                         shape, offsets = CuDensityMat.local_info(psi)
                         @test length(shape) == length(offsets)
                         # Pure: ndims = len(dims) + batch
@@ -57,13 +61,17 @@
             ws = WorkStream()
             comm_ptr = Ptr{Cvoid}(_MPI_mod.API.MPI_Comm_c2f(comm))
             comm_size = sizeof(_MPI_mod.MPI_Comm)
-            CuDensityMat.set_communicator!(ws, :mpi;
-                comm_ptr=comm_ptr, comm_size=comm_size)
+            CuDensityMat.set_communicator!(
+                ws,
+                :mpi;
+                comm_ptr = comm_ptr,
+                comm_size = comm_size,
+            )
 
             for T in [ComplexF64, ComplexF32]
                 for dims in [(2, 2, 2)]
                     for bs in [1, 2]
-                        rho = DenseMixedState{T}(ws, dims; batch_size=bs)
+                        rho = DenseMixedState{T}(ws, dims; batch_size = bs)
                         shape, offsets = CuDensityMat.local_info(rho)
                         @test length(shape) == length(offsets)
                         # Mixed: ndims = 2*len(dims) + batch
@@ -93,10 +101,14 @@
             ws = WorkStream()
             comm_ptr = Ptr{Cvoid}(_MPI_mod.API.MPI_Comm_c2f(comm))
             comm_size = sizeof(_MPI_mod.MPI_Comm)
-            CuDensityMat.set_communicator!(ws, :mpi;
-                comm_ptr=comm_ptr, comm_size=comm_size)
+            CuDensityMat.set_communicator!(
+                ws,
+                :mpi;
+                comm_ptr = comm_ptr,
+                comm_size = comm_size,
+            )
 
-            psi = DensePureState{ComplexF64}(ws, (2, 2, 2); batch_size=1)
+            psi = DensePureState{ComplexF64}(ws, (2, 2, 2); batch_size = 1)
             CuDensityMat.allocate_storage!(psi)
             @test psi.storage !== nothing
             @test length(psi.storage) == CuDensityMat.storage_size(psi)
@@ -116,10 +128,14 @@
             ws = WorkStream()
             comm_ptr = Ptr{Cvoid}(_MPI_mod.API.MPI_Comm_c2f(comm))
             comm_size = sizeof(_MPI_mod.MPI_Comm)
-            CuDensityMat.set_communicator!(ws, :mpi;
-                comm_ptr=comm_ptr, comm_size=comm_size)
+            CuDensityMat.set_communicator!(
+                ws,
+                :mpi;
+                comm_ptr = comm_ptr,
+                comm_size = comm_size,
+            )
 
-            psi = DensePureState{ComplexF64}(ws, (2, 2, 2); batch_size=2)
+            psi = DensePureState{ComplexF64}(ws, (2, 2, 2); batch_size = 2)
             CuDensityMat.allocate_storage!(psi)
             v = CuDensityMat.state_view(psi)
             shape, _ = CuDensityMat.local_info(psi)
@@ -140,10 +156,14 @@
             ws = WorkStream()
             comm_ptr = Ptr{Cvoid}(_MPI_mod.API.MPI_Comm_c2f(comm))
             comm_size = sizeof(_MPI_mod.MPI_Comm)
-            CuDensityMat.set_communicator!(ws, :mpi;
-                comm_ptr=comm_ptr, comm_size=comm_size)
+            CuDensityMat.set_communicator!(
+                ws,
+                :mpi;
+                comm_ptr = comm_ptr,
+                comm_size = comm_size,
+            )
 
-            psi = DensePureState{ComplexF64}(ws, (2, 2, 2); batch_size=1)
+            psi = DensePureState{ComplexF64}(ws, (2, 2, 2); batch_size = 1)
             CuDensityMat.allocate_storage!(psi)
             # Fill with ones for predictable norm
             psi.storage .= one(ComplexF64)
@@ -167,10 +187,14 @@
             ws = WorkStream()
             comm_ptr = Ptr{Cvoid}(_MPI_mod.API.MPI_Comm_c2f(comm))
             comm_size = sizeof(_MPI_mod.MPI_Comm)
-            CuDensityMat.set_communicator!(ws, :mpi;
-                comm_ptr=comm_ptr, comm_size=comm_size)
+            CuDensityMat.set_communicator!(
+                ws,
+                :mpi;
+                comm_ptr = comm_ptr,
+                comm_size = comm_size,
+            )
 
-            psi = DensePureState{ComplexF64}(ws, (2, 2, 2); batch_size=1)
+            psi = DensePureState{ComplexF64}(ws, (2, 2, 2); batch_size = 1)
             CuDensityMat.allocate_storage!(psi)
             psi.storage .= one(ComplexF64)
             t = CuDensityMat.trace(psi)
@@ -192,10 +216,14 @@
             ws = WorkStream()
             comm_ptr = Ptr{Cvoid}(_MPI_mod.API.MPI_Comm_c2f(comm))
             comm_size = sizeof(_MPI_mod.MPI_Comm)
-            CuDensityMat.set_communicator!(ws, :mpi;
-                comm_ptr=comm_ptr, comm_size=comm_size)
+            CuDensityMat.set_communicator!(
+                ws,
+                :mpi;
+                comm_ptr = comm_ptr,
+                comm_size = comm_size,
+            )
 
-            psi = DensePureState{ComplexF64}(ws, (2, 2, 2); batch_size=1)
+            psi = DensePureState{ComplexF64}(ws, (2, 2, 2); batch_size = 1)
             CuDensityMat.allocate_storage!(psi)
             psi.storage .= one(ComplexF64)
             original = Array(psi.storage)
@@ -218,10 +246,14 @@
             ws = WorkStream()
             comm_ptr = Ptr{Cvoid}(_MPI_mod.API.MPI_Comm_c2f(comm))
             comm_size = sizeof(_MPI_mod.MPI_Comm)
-            CuDensityMat.set_communicator!(ws, :mpi;
-                comm_ptr=comm_ptr, comm_size=comm_size)
+            CuDensityMat.set_communicator!(
+                ws,
+                :mpi;
+                comm_ptr = comm_ptr,
+                comm_size = comm_size,
+            )
 
-            psi1 = DensePureState{ComplexF64}(ws, (2, 2, 2); batch_size=1)
+            psi1 = DensePureState{ComplexF64}(ws, (2, 2, 2); batch_size = 1)
             CuDensityMat.allocate_storage!(psi1)
             psi1.storage .= ComplexF64(1.0)
 

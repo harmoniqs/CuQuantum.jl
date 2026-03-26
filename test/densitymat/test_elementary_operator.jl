@@ -71,8 +71,13 @@
         offsets = Int32[-1, 0, 1]  # sub-diagonal, main diagonal, super-diagonal
         # Data shape: d × num_diags (stored flat)
         data = CUDA.rand(ComplexF64, d * num_diags)
-        op = CuDensityMat.create_elementary_operator(ws, [d], data;
-            sparsity=:multidiagonal, diagonal_offsets=offsets)
+        op = CuDensityMat.create_elementary_operator(
+            ws,
+            [d],
+            data;
+            sparsity = :multidiagonal,
+            diagonal_offsets = offsets,
+        )
         @test isopen(op)
         CuDensityMat.destroy_elementary_operator(op)
         close(ws)
@@ -85,8 +90,14 @@
         batch_size = 2
         offsets = Int32[0, 1]
         data = CUDA.rand(ComplexF64, d * num_diags * batch_size)
-        op = CuDensityMat.create_elementary_operator_batch(ws, [d], data, batch_size;
-            sparsity=:multidiagonal, diagonal_offsets=offsets)
+        op = CuDensityMat.create_elementary_operator_batch(
+            ws,
+            [d],
+            data,
+            batch_size;
+            sparsity = :multidiagonal,
+            diagonal_offsets = offsets,
+        )
         @test isopen(op)
         CuDensityMat.destroy_elementary_operator(op)
         close(ws)

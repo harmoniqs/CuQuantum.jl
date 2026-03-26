@@ -37,15 +37,19 @@
         T = ComplexF64   # data type
 
         # Physical parameters (MHz and μs)
-        χ  = 2π * 0.2    # self-Kerr nonlinearity
-        Δ  = [2π * 1.0,   # detuning amplitude, cavity 1
-              2π * 0.8]   # detuning amplitude, cavity 2
-        ω_δ = [2π * 0.5,  # detuning modulation frequency, cavity 1
-               2π * 0.4]  # detuning modulation frequency, cavity 2
+        χ = 2π * 0.2    # self-Kerr nonlinearity
+        Δ = [
+            2π * 1.0,   # detuning amplitude, cavity 1
+            2π * 0.8,
+        ]   # detuning amplitude, cavity 2
+        ω_δ = [
+            2π * 0.5,  # detuning modulation frequency, cavity 1
+            2π * 0.4,
+        ]  # detuning modulation frequency, cavity 2
         κ₀ = 2π * 0.1    # base coupling strength
-        ε  = 0.3          # coupling modulation depth
+        ε = 0.3          # coupling modulation depth
         ω_κ = 2π * 0.2   # coupling modulation frequency
-        γ  = 0.01         # photon loss rate
+        γ = 0.01         # photon loss rate
 
         # Simulation (RK4 allows much larger dt than Euler)
         t_final = 2.0     # total time (μs)
@@ -67,13 +71,13 @@
         #   a = [[0, 1, 0],
         #        [0, 0, √2],
         #        [0, 0, 0]]   (column-major storage)
-        a_mat = T[0, 0, 0,   1, 0, 0,   0, √2, 0]
+        a_mat = T[0, 0, 0, 1, 0, 0, 0, √2, 0]
 
         # Number operator: n = a†a = diag(0, 1, 2)
-        n_mat = T[0, 0, 0,   0, 1, 0,   0, 0, 2]
+        n_mat = T[0, 0, 0, 0, 1, 0, 0, 0, 2]
 
         # Self-Kerr operator: n(n-1) = a†²a² = diag(0, 0, 2)
-        kerr_mat = T[0, 0, 0,   0, 0, 0,   0, 0, 2]
+        kerr_mat = T[0, 0, 0, 0, 0, 0, 0, 0, 2]
 
         # =====================================================================
         # 4. Build fused 2-mode operators for Lindblad dissipation
@@ -91,11 +95,13 @@
         # and the second pair (i1, j1) acts on the bra side (right of ρ),
         # giving: a_m ρ a_m†
         aa_dag_fused = zeros(T, d, d, d, d)
-        a_matrix = [0.0  1.0  0.0;
-                    0.0  0.0  √2;
-                    0.0  0.0  0.0]  # a as a proper matrix
+        a_matrix = [
+            0.0 1.0 0.0;
+            0.0 0.0 √2;
+            0.0 0.0 0.0
+        ]  # a as a proper matrix
         a_dag_matrix = transpose(a_matrix)  # a† (real operator, so transpose = adjoint)
-        for j1 in 1:d, j0 in 1:d, i1 in 1:d, i0 in 1:d
+        for j1 = 1:d, j0 = 1:d, i1 = 1:d, i0 = 1:d
             # F[i0, i1, j0, j1] = a[i0, j0] * a†[i1, j1]
             aa_dag_fused[i0, i1, j0, j1] = a_matrix[i0, j0] * a_dag_matrix[i1, j1]
         end
@@ -104,9 +110,9 @@
         # 5. Upload operator data to GPU
         # =====================================================================
 
-        a_gpu      = CUDA.CuVector{T}(a_mat)
-        n_gpu      = CUDA.CuVector{T}(n_mat)
-        kerr_gpu   = CUDA.CuVector{T}(kerr_mat)
+        a_gpu = CUDA.CuVector{T}(a_mat)
+        n_gpu = CUDA.CuVector{T}(n_mat)
+        kerr_gpu = CUDA.CuVector{T}(kerr_mat)
         aa_dag_gpu = CUDA.CuVector{T}(vec(aa_dag_fused))  # flatten to 81-element vector
 
         # =====================================================================
@@ -114,7 +120,7 @@
         # =====================================================================
 
         # Single-mode operators (act on one cavity, d=3)
-        elem_n    = CuDensityMat.create_elementary_operator(ws, [d], n_gpu)
+        elem_n = CuDensityMat.create_elementary_operator(ws, [d], n_gpu)
         elem_kerr = CuDensityMat.create_elementary_operator(ws, [d], kerr_gpu)
 
         # Annihilation operator — needed for the beam-splitter coupling a_n†a_m.
@@ -124,7 +130,7 @@
         #   C_10[i0, i1; j0, j1] = a[i0; j0] × a†[i1; j1]   (cavity 0 annihilation, cavity 1 creation)
         coupling_01 = zeros(T, d, d, d, d)  # a₀†a₁
         coupling_10 = zeros(T, d, d, d, d)  # a₁†a₀ = (a₀†a₁)†
-        for j1 in 1:d, j0 in 1:d, i1 in 1:d, i0 in 1:d
+        for j1 = 1:d, j0 = 1:d, i1 = 1:d, i0 = 1:d
             coupling_01[i0, i1, j0, j1] = a_dag_matrix[i0, j0] * a_matrix[i1, j1]
             coupling_10[i0, i1, j0, j1] = a_matrix[i0, j0] * a_dag_matrix[i1, j1]
         end
@@ -132,9 +138,11 @@
         coupling_10_gpu = CUDA.CuVector{T}(vec(coupling_10))
 
         # 2-mode fused elementary operators
-        elem_aa_dag     = CuDensityMat.create_elementary_operator(ws, [d, d], aa_dag_gpu)
-        elem_coupling01 = CuDensityMat.create_elementary_operator(ws, [d, d], coupling_01_gpu)
-        elem_coupling10 = CuDensityMat.create_elementary_operator(ws, [d, d], coupling_10_gpu)
+        elem_aa_dag = CuDensityMat.create_elementary_operator(ws, [d, d], aa_dag_gpu)
+        elem_coupling01 =
+            CuDensityMat.create_elementary_operator(ws, [d, d], coupling_01_gpu)
+        elem_coupling10 =
+            CuDensityMat.create_elementary_operator(ws, [d, d], coupling_10_gpu)
 
         # =====================================================================
         # 7. Build Hamiltonian operator terms
@@ -144,13 +152,13 @@
         # This is a static (time-independent) term.
         # We create one OperatorTerm and add the Kerr operator on each mode.
         kerr_term = CuDensityMat.create_operator_term(ws, dims)
-        for m in 0:(M-1)
+        for m = 0:(M-1)
             CuDensityMat.append_elementary_product!(
                 kerr_term,
                 [elem_kerr],        # single Kerr operator
                 Int32[m],           # acts on cavity m
                 Int32[0];           # ket-side (duality = 0)
-                coefficient = ComplexF64(χ)  # static coefficient χ
+                coefficient = ComplexF64(χ),  # static coefficient χ
             )
         end
 
@@ -164,7 +172,8 @@
                 storage[b] = ComplexF64(Δ[1] * sin(ω_δ[1] * time))
             end
         end
-        det1_cb, det1_gcb, det1_refs = CuDensityMat.wrap_scalar_callback(detuning_1_callback)
+        det1_cb, det1_gcb, det1_refs =
+            CuDensityMat.wrap_scalar_callback(detuning_1_callback)
 
         detuning_term_1 = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(
@@ -174,7 +183,7 @@
             Int32[0];       # ket-side
             coefficient = ComplexF64(1.0),      # static part = 1 (callback provides δ₁(t))
             coefficient_callback = det1_cb,
-            coefficient_gradient_callback = det1_gcb
+            coefficient_gradient_callback = det1_gcb,
         )
 
         # Detuning callback for cavity 2: δ₂(t) = Δ₂ sin(ω₂ t)
@@ -183,7 +192,8 @@
                 storage[b] = ComplexF64(Δ[2] * sin(ω_δ[2] * time))
             end
         end
-        det2_cb, det2_gcb, det2_refs = CuDensityMat.wrap_scalar_callback(detuning_2_callback)
+        det2_cb, det2_gcb, det2_refs =
+            CuDensityMat.wrap_scalar_callback(detuning_2_callback)
 
         detuning_term_2 = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(
@@ -193,7 +203,7 @@
             Int32[0];
             coefficient = ComplexF64(1.0),
             coefficient_callback = det2_cb,
-            coefficient_gradient_callback = det2_gcb
+            coefficient_gradient_callback = det2_gcb,
         )
 
         # --- 7c. Coupling term: H_coup = √(κ₁(t)κ₂(t)) (a₀†a₁ + a₁†a₀) ---
@@ -220,7 +230,7 @@
             Int32[0, 0];    # both ket-side
             coefficient = ComplexF64(1.0),
             coefficient_callback = coup_cb,
-            coefficient_gradient_callback = coup_gcb
+            coefficient_gradient_callback = coup_gcb,
         )
         # a₁†a₀: Hermitian conjugate direction, same coefficient
         CuDensityMat.append_elementary_product!(
@@ -230,7 +240,7 @@
             Int32[0, 0];
             coefficient = ComplexF64(1.0),
             coefficient_callback = coup_cb,
-            coefficient_gradient_callback = coup_gcb
+            coefficient_gradient_callback = coup_gcb,
         )
 
         # =====================================================================
@@ -253,13 +263,13 @@
         # physical cavity m. This is the same pattern as the YY dissipation in
         # NVIDIA's C++ sample.
         dissipation_sandwich = CuDensityMat.create_operator_term(ws, dims)
-        for m in 0:(M-1)
+        for m = 0:(M-1)
             CuDensityMat.append_elementary_product!(
                 dissipation_sandwich,
                 [elem_aa_dag],
                 Int32[m, m],     # both indices map to cavity m
                 Int32[0, 1];     # ket-side and bra-side (sandwich)
-                coefficient = ComplexF64(1.0)  # coefficient γ applied when appending to Operator
+                coefficient = ComplexF64(1.0),  # coefficient γ applied when appending to Operator
             )
         end
 
@@ -268,13 +278,13 @@
         #   once with duality=0, coeff=-γ/2  (left: -½ n_m ρ)
         #   once with duality=1, coeff=-γ/2  (right: -½ ρ n_m)
         dissipation_number = CuDensityMat.create_operator_term(ws, dims)
-        for m in 0:(M-1)
+        for m = 0:(M-1)
             CuDensityMat.append_elementary_product!(
                 dissipation_number,
                 [elem_n],
                 Int32[m],
                 Int32[0];
-                coefficient = ComplexF64(1.0)
+                coefficient = ComplexF64(1.0),
             )
         end
 
@@ -297,32 +307,52 @@
         # Hamiltonian: -i[H, ρ]
         # Each Hamiltonian term is appended twice (left and right of ρ)
         for (term, label) in [
-            (kerr_term,       "Kerr"),
+            (kerr_term, "Kerr"),
             (detuning_term_1, "Detuning₁"),
             (detuning_term_2, "Detuning₂"),
-            (coupling_term,   "Coupling"),
+            (coupling_term, "Coupling"),
         ]
             # -i × H × ρ  (acts from the left)
-            CuDensityMat.append_term!(liouvillian, term;
-                duality=0, coefficient=ComplexF64(0, -1))
+            CuDensityMat.append_term!(
+                liouvillian,
+                term;
+                duality = 0,
+                coefficient = ComplexF64(0, -1),
+            )
             # +i × ρ × H  (acts from the right)
-            CuDensityMat.append_term!(liouvillian, term;
-                duality=1, coefficient=ComplexF64(0, +1))
+            CuDensityMat.append_term!(
+                liouvillian,
+                term;
+                duality = 1,
+                coefficient = ComplexF64(0, +1),
+            )
         end
 
         # Lindblad dissipation
         # Sandwich: γ × (a_m ρ a_m†) — duality=0 because the duality is already
         # encoded in the mode_action_duality of the elementary product
-        CuDensityMat.append_term!(liouvillian, dissipation_sandwich;
-            duality=0, coefficient=ComplexF64(γ))
+        CuDensityMat.append_term!(
+            liouvillian,
+            dissipation_sandwich;
+            duality = 0,
+            coefficient = ComplexF64(γ),
+        )
 
         # Anticommutator: -γ/2 × n_m ρ  (left side)
-        CuDensityMat.append_term!(liouvillian, dissipation_number;
-            duality=0, coefficient=ComplexF64(-γ/2))
+        CuDensityMat.append_term!(
+            liouvillian,
+            dissipation_number;
+            duality = 0,
+            coefficient = ComplexF64(-γ/2),
+        )
 
         # Anticommutator: -γ/2 × ρ n_m  (right side)
-        CuDensityMat.append_term!(liouvillian, dissipation_number;
-            duality=1, coefficient=ComplexF64(-γ/2))
+        CuDensityMat.append_term!(
+            liouvillian,
+            dissipation_number;
+            duality = 1,
+            coefficient = ComplexF64(-γ/2),
+        )
 
         # =====================================================================
         # 10. Prepare the initial state
@@ -340,15 +370,15 @@
 
         d_total = prod(dims)  # 9
         rho_init = zeros(T, d_total * d_total)
-        rho_init[2 + d_total * (2-1)] = 1.0 + 0im  # ρ[|1,0⟩, |1,0⟩] = 1
+        rho_init[2+d_total*(2-1)] = 1.0 + 0im  # ρ[|1,0⟩, |1,0⟩] = 1
         rho_init_gpu = CUDA.CuVector{T}(rho_init)
 
-        rho = DenseMixedState{T}(ws, Tuple(dims); batch_size=1)
+        rho = DenseMixedState{T}(ws, Tuple(dims); batch_size = 1)
         CuDensityMat.allocate_storage!(rho)
         copyto!(rho.storage, rho_init_gpu)
 
         # Output state for ρ̇ = L[ρ]
-        rho_dot = DenseMixedState{T}(ws, Tuple(dims); batch_size=1)
+        rho_dot = DenseMixedState{T}(ws, Tuple(dims); batch_size = 1)
         CuDensityMat.allocate_storage!(rho_dot)
 
         # =====================================================================
@@ -365,11 +395,11 @@
         #   k4 = L(t + dt,   ρ + dt   × k3)
         #   ρ(t+dt) = ρ(t) + (dt/6)(k1 + 2k2 + 2k3 + k4)
 
-        k1 = DenseMixedState{T}(ws, Tuple(dims); batch_size=1)
-        k2 = DenseMixedState{T}(ws, Tuple(dims); batch_size=1)
-        k3 = DenseMixedState{T}(ws, Tuple(dims); batch_size=1)
-        k4 = DenseMixedState{T}(ws, Tuple(dims); batch_size=1)
-        rho_tmp = DenseMixedState{T}(ws, Tuple(dims); batch_size=1)
+        k1 = DenseMixedState{T}(ws, Tuple(dims); batch_size = 1)
+        k2 = DenseMixedState{T}(ws, Tuple(dims); batch_size = 1)
+        k3 = DenseMixedState{T}(ws, Tuple(dims); batch_size = 1)
+        k4 = DenseMixedState{T}(ws, Tuple(dims); batch_size = 1)
+        rho_tmp = DenseMixedState{T}(ws, Tuple(dims); batch_size = 1)
         CuDensityMat.allocate_storage!(k1)
         CuDensityMat.allocate_storage!(k2)
         CuDensityMat.allocate_storage!(k3)
@@ -407,7 +437,7 @@
             d_tot = d_total
 
             push!(times, t)
-            tr = sum(rho_cpu[k + d_tot*(k-1)] for k in 1:d_tot)
+            tr = sum(rho_cpu[k+d_tot*(k-1)] for k = 1:d_tot)
             push!(traces, tr)
 
             # Fock state indices: |n₁,n₂⟩ → flat index = n₁ + d*n₂ + 1 (1-based)
@@ -417,11 +447,11 @@
             idx_20 = 1 + 2 + d * 0  # |2,0⟩
             idx_02 = 1 + 0 + d * 2  # |0,2⟩
 
-            push!(pop_10, real(rho_cpu[idx_10 + d_tot*(idx_10-1)]))
-            push!(pop_01, real(rho_cpu[idx_01 + d_tot*(idx_01-1)]))
-            push!(pop_00, real(rho_cpu[idx_00 + d_tot*(idx_00-1)]))
-            push!(pop_20, real(rho_cpu[idx_20 + d_tot*(idx_20-1)]))
-            push!(pop_02, real(rho_cpu[idx_02 + d_tot*(idx_02-1)]))
+            push!(pop_10, real(rho_cpu[idx_10+d_tot*(idx_10-1)]))
+            push!(pop_01, real(rho_cpu[idx_01+d_tot*(idx_01-1)]))
+            push!(pop_00, real(rho_cpu[idx_00+d_tot*(idx_00-1)]))
+            push!(pop_20, real(rho_cpu[idx_20+d_tot*(idx_20-1)]))
+            push!(pop_02, real(rho_cpu[idx_02+d_tot*(idx_02-1)]))
         end
 
         # Helper: copy state a into state b (GPU-to-GPU)
@@ -432,14 +462,20 @@
         # Helper: compute L[rho_in] at time t → store in k_out
         function eval_liouvillian!(k_out, rho_in, t)
             CuDensityMat.initialize_zero!(k_out)
-            CuDensityMat.compute_operator_action!(ws, liouvillian, rho_in, k_out;
-                time=t, batch_size=1)
+            CuDensityMat.compute_operator_action!(
+                ws,
+                liouvillian,
+                rho_in,
+                k_out;
+                time = t,
+                batch_size = 1,
+            )
         end
 
         # Record initial state
         record_observables!(0.0, rho)
 
-        for step in 1:n_steps
+        for step = 1:n_steps
             t = (step - 1) * dt
 
             # --- k1 = L(t, ρ) ---
@@ -512,16 +548,22 @@
         open(trajectory_file, "w") do io
             println(io, "time,trace_real,trace_imag,pop_10,pop_01,pop_00,pop_20,pop_02")
             for i in eachindex(times)
-                println(io, join([
-                    times[i],
-                    real(traces[i]),
-                    imag(traces[i]),
-                    pop_10[i],
-                    pop_01[i],
-                    pop_00[i],
-                    pop_20[i],
-                    pop_02[i],
-                ], ","))
+                println(
+                    io,
+                    join(
+                        [
+                            times[i],
+                            real(traces[i]),
+                            imag(traces[i]),
+                            pop_10[i],
+                            pop_01[i],
+                            pop_00[i],
+                            pop_20[i],
+                            pop_02[i],
+                        ],
+                        ",",
+                    ),
+                )
             end
         end
         @test isfile(trajectory_file)
@@ -536,7 +578,7 @@
         close(ws)
 
         # Print summary for visual inspection
-        r6(x) = round(x; digits=6)
+        r6(x) = round(x; digits = 6)
         println("\n  Dual-Rail Lindblad Simulation Complete")
         println("  System: M=2 cavities, dim=3 each, RK4 integrator")
         println("  Steps:  $(n_steps) x dt=$(dt) us = $(t_final) us")

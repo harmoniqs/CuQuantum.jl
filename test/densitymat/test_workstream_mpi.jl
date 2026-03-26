@@ -35,8 +35,12 @@ end
             comm_ptr = Ptr{Cvoid}(_MPI_mod.API.MPI_Comm_c2f(comm))
             comm_size = sizeof(_MPI_mod.MPI_Comm)
 
-            CuDensityMat.set_communicator!(ws, :mpi;
-                comm_ptr=comm_ptr, comm_size=comm_size)
+            CuDensityMat.set_communicator!(
+                ws,
+                :mpi;
+                comm_ptr = comm_ptr,
+                comm_size = comm_size,
+            )
 
             @test CuDensityMat.get_num_ranks(ws) == nranks
             @test CuDensityMat.get_proc_rank(ws) == rank
@@ -63,8 +67,12 @@ end
             comm_ptr = UInt(_MPI_mod.API.MPI_Comm_c2f(comm))
             comm_size = sizeof(_MPI_mod.MPI_Comm)
 
-            CuDensityMat.set_communicator!(ws, :mpi;
-                comm_ptr=comm_ptr, comm_size=comm_size)
+            CuDensityMat.set_communicator!(
+                ws,
+                :mpi;
+                comm_ptr = comm_ptr,
+                comm_size = comm_size,
+            )
 
             @test CuDensityMat.get_num_ranks(ws) == nranks
             @test CuDensityMat.get_proc_rank(ws) == rank
@@ -87,12 +95,20 @@ end
             comm_ptr = Ptr{Cvoid}(_MPI_mod.API.MPI_Comm_c2f(comm))
             comm_size = sizeof(_MPI_mod.MPI_Comm)
 
-            CuDensityMat.set_communicator!(ws, :mpi;
-                comm_ptr=comm_ptr, comm_size=comm_size)
+            CuDensityMat.set_communicator!(
+                ws,
+                :mpi;
+                comm_ptr = comm_ptr,
+                comm_size = comm_size,
+            )
 
             # Second set should error
-            @test_throws ErrorException CuDensityMat.set_communicator!(ws, :mpi;
-                comm_ptr=comm_ptr, comm_size=comm_size)
+            @test_throws ErrorException CuDensityMat.set_communicator!(
+                ws,
+                :mpi;
+                comm_ptr = comm_ptr,
+                comm_size = comm_size,
+            )
 
             close(ws)
         end

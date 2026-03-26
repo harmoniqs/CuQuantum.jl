@@ -31,7 +31,11 @@
         # Create term and append product (all ket-side: duality=0)
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(
-            term, [op_a, op_b], Int32[0, 1], Int32[0, 0])
+            term,
+            [op_a, op_b],
+            Int32[0, 1],
+            Int32[0, 0],
+        )
         @test length(term._elem_op_refs) == 2
 
         CuDensityMat.destroy_operator_term(term)
@@ -67,8 +71,7 @@
 
         term = CuDensityMat.create_operator_term(ws, dims)
         # Single matrix operator, no conjugation, ket-side
-        CuDensityMat.append_matrix_product!(
-            term, [mat_op], Int32[0], Int32[0])
+        CuDensityMat.append_matrix_product!(term, [mat_op], Int32[0], Int32[0])
         @test length(term._matrix_op_refs) == 1
 
         CuDensityMat.destroy_operator_term(term)
@@ -101,7 +104,12 @@
 
         # Build term: A⊗B (both ket-side)
         term1 = CuDensityMat.create_operator_term(ws, dims)
-        CuDensityMat.append_elementary_product!(term1, [op_a, op_b], Int32[0, 1], Int32[0, 0])
+        CuDensityMat.append_elementary_product!(
+            term1,
+            [op_a, op_b],
+            Int32[0, 1],
+            Int32[0, 0],
+        )
 
         # Build term: A on mode 0 (bra-side)
         term2 = CuDensityMat.create_operator_term(ws, dims)
@@ -109,8 +117,8 @@
 
         # Assemble operator
         operator = CuDensityMat.create_operator(ws, dims)
-        CuDensityMat.append_term!(operator, term1; duality=0, coefficient=1.0)
-        CuDensityMat.append_term!(operator, term2; duality=1, coefficient=0.5+0.1im)
+        CuDensityMat.append_term!(operator, term1; duality = 0, coefficient = 1.0)
+        CuDensityMat.append_term!(operator, term2; duality = 1, coefficient = 0.5+0.1im)
         @test length(operator._term_refs) == 2
 
         CuDensityMat.destroy_operator(operator)
@@ -148,11 +156,11 @@
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
 
         operator = CuDensityMat.create_operator(ws, dims)
-        CuDensityMat.append_term!(operator, term; duality=0, coefficient=1.0)
+        CuDensityMat.append_term!(operator, term; duality = 0, coefficient = 1.0)
 
         # Create input and output states
-        psi_in = DenseMixedState{T}(ws, (2,); batch_size=1)
-        psi_out = DenseMixedState{T}(ws, (2,); batch_size=1)
+        psi_in = DenseMixedState{T}(ws, (2,); batch_size = 1)
+        psi_out = DenseMixedState{T}(ws, (2,); batch_size = 1)
         CuDensityMat.allocate_storage!(psi_in)
         CuDensityMat.allocate_storage!(psi_out)
 
@@ -164,8 +172,14 @@
 
         # Zero output state, then compute
         CuDensityMat.initialize_zero!(psi_out)
-        CuDensityMat.compute_operator_action!(ws, operator, psi_in, psi_out;
-            time=0.0, batch_size=1)
+        CuDensityMat.compute_operator_action!(
+            ws,
+            operator,
+            psi_in,
+            psi_out;
+            time = 0.0,
+            batch_size = 1,
+        )
 
         # Verify output is non-zero (sigma_z * rho should be non-trivial)
         result = Array(psi_out.storage)
@@ -192,18 +206,18 @@
         CuDensityMat.append_elementary_product!(term_x, [elem_x], Int32[0], Int32[0])
 
         op1 = CuDensityMat.create_operator(ws, dims)
-        CuDensityMat.append_term!(op1, term_z; duality=0)
+        CuDensityMat.append_term!(op1, term_z; duality = 0)
         op2 = CuDensityMat.create_operator(ws, dims)
-        CuDensityMat.append_term!(op2, term_x; duality=0)
+        CuDensityMat.append_term!(op2, term_x; duality = 0)
 
         # Create action with two operators
         action = CuDensityMat.create_operator_action(ws, [op1, op2])
         @test isopen(action)
 
         # Input states (one per operator)
-        psi_in1 = DenseMixedState{T}(ws, (2,); batch_size=1)
-        psi_in2 = DenseMixedState{T}(ws, (2,); batch_size=1)
-        psi_out = DenseMixedState{T}(ws, (2,); batch_size=1)
+        psi_in1 = DenseMixedState{T}(ws, (2,); batch_size = 1)
+        psi_in2 = DenseMixedState{T}(ws, (2,); batch_size = 1)
+        psi_out = DenseMixedState{T}(ws, (2,); batch_size = 1)
         CuDensityMat.allocate_storage!(psi_in1)
         CuDensityMat.allocate_storage!(psi_in2)
         CuDensityMat.allocate_storage!(psi_out)
@@ -215,8 +229,14 @@
 
         # Zero output state, then compute
         CuDensityMat.initialize_zero!(psi_out)
-        CuDensityMat.compute_action!(ws, action, [psi_in1, psi_in2], psi_out;
-            time=0.0, batch_size=1)
+        CuDensityMat.compute_action!(
+            ws,
+            action,
+            [psi_in1, psi_in2],
+            psi_out;
+            time = 0.0,
+            batch_size = 1,
+        )
 
         result = Array(psi_out.storage)
         @test any(x -> abs(x) > 0, result)

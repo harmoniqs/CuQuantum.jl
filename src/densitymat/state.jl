@@ -7,7 +7,7 @@ export DensePureState, DenseMixedState
 
 # --- Julia type → cudaDataType mapping ---
 
-function julia_to_cuda_dtype(::Type{T}) where T
+function julia_to_cuda_dtype(::Type{T}) where {T}
     if T === Float32
         CUDA.R_32F
     elseif T === Float64
@@ -17,11 +17,13 @@ function julia_to_cuda_dtype(::Type{T}) where T
     elseif T === ComplexF64
         CUDA.C_64F
     else
-        error("Unsupported data type: $T. Supported: Float32, Float64, ComplexF32, ComplexF64")
+        error(
+            "Unsupported data type: $T. Supported: Float32, Float64, ComplexF32, ComplexF64",
+        )
     end
 end
 
-function real_eltype(::Type{T}) where T
+function real_eltype(::Type{T}) where {T}
     if T === ComplexF32 || T === Float32
         Float32
     elseif T === ComplexF64 || T === Float64
@@ -57,11 +59,14 @@ mutable struct DensePureState{T} <: AbstractState{T}
     hilbert_space_dims::Vector{Int64}
     batch_size::Int64
     handle::cudensitymatState_t
-    storage::Union{Nothing, CUDA.CuVector{T}}
+    storage::Union{Nothing,CUDA.CuVector{T}}
     _owns_storage::Bool
 
-    function DensePureState{T}(ws::WorkStream, hilbert_space_dims;
-                               batch_size::Integer=1) where T
+    function DensePureState{T}(
+        ws::WorkStream,
+        hilbert_space_dims;
+        batch_size::Integer = 1,
+    ) where {T}
         _check_valid(ws)
         dims = Int64[d for d in hilbert_space_dims]
         state_ref = Ref{cudensitymatState_t}()
@@ -72,7 +77,7 @@ mutable struct DensePureState{T} <: AbstractState{T}
             dims,
             Int64(batch_size),
             julia_to_cuda_dtype(T),
-            state_ref
+            state_ref,
         )
         obj = new{T}(ws, dims, Int64(batch_size), state_ref[], nothing, false)
         finalizer(obj) do x
@@ -107,11 +112,14 @@ mutable struct DenseMixedState{T} <: AbstractState{T}
     hilbert_space_dims::Vector{Int64}
     batch_size::Int64
     handle::cudensitymatState_t
-    storage::Union{Nothing, CUDA.CuVector{T}}
+    storage::Union{Nothing,CUDA.CuVector{T}}
     _owns_storage::Bool
 
-    function DenseMixedState{T}(ws::WorkStream, hilbert_space_dims;
-                                batch_size::Integer=1) where T
+    function DenseMixedState{T}(
+        ws::WorkStream,
+        hilbert_space_dims;
+        batch_size::Integer = 1,
+    ) where {T}
         _check_valid(ws)
         dims = Int64[d for d in hilbert_space_dims]
         state_ref = Ref{cudensitymatState_t}()
@@ -122,7 +130,7 @@ mutable struct DenseMixedState{T} <: AbstractState{T}
             dims,
             Int64(batch_size),
             julia_to_cuda_dtype(T),
-            state_ref
+            state_ref,
         )
         obj = new{T}(ws, dims, Int64(batch_size), state_ref[], nothing, false)
         finalizer(obj) do x
@@ -135,7 +143,7 @@ mutable struct DenseMixedState{T} <: AbstractState{T}
     end
 end
 
-const DenseState{T} = Union{DensePureState{T}, DenseMixedState{T}}
+const DenseState{T} = Union{DensePureState{T},DenseMixedState{T}}
 
 ispure(::DensePureState) = true
 ispure(::DenseMixedState) = false
@@ -170,8 +178,12 @@ function component_storage_size(state::AbstractState)
     _check_state_valid(state)
     nc = num_components(state)
     sizes = Vector{Csize_t}(undef, nc)
-    cudensitymatStateGetComponentStorageSize(state.ws.handle, state.handle,
-                                             Int32(nc), sizes)
+    cudensitymatStateGetComponentStorageSize(
+        state.ws.handle,
+        state.handle,
+        Int32(nc),
+        sizes,
+    )
     return Int[s for s in sizes]
 end
 
@@ -180,7 +192,7 @@ end
 
 Storage buffer size in number of elements of the state's data type.
 """
-function storage_size(state::DenseState{T}) where T
+function storage_size(state::DenseState{T}) where {T}
     sizes = component_storage_size(state)
     return sizes[1] ÷ sizeof(T)
 end
@@ -191,7 +203,7 @@ end
 Local storage buffer dimensions and mode offsets.
 The last dimension is always the batch dimension.
 """
-function local_info(state::DenseState{T}) where T
+function local_info(state::DenseState{T}) where {T}
     _check_state_valid(state)
 
     # Get number of modes for component 0
@@ -199,8 +211,12 @@ function local_info(state::DenseState{T}) where T
     num_modes = Ref{Int32}()
     batch_loc = Ref{Int32}()
     cudensitymatStateGetComponentNumModes(
-        state.ws.handle, state.handle, Int32(0),
-        global_id, num_modes, batch_loc
+        state.ws.handle,
+        state.handle,
+        Int32(0),
+        global_id,
+        num_modes,
+        batch_loc,
     )
     nm = Int(num_modes[])
 
@@ -210,8 +226,13 @@ function local_info(state::DenseState{T}) where T
     gid = Ref{Int32}()
     nmod = Ref{Int32}()
     cudensitymatStateGetComponentInfo(
-        state.ws.handle, state.handle, Int32(0),
-        gid, nmod, extents, offsets
+        state.ws.handle,
+        state.handle,
+        Int32(0),
+        gid,
+        nmod,
+        extents,
+        offsets,
     )
 
     shape = Tuple(extents)
@@ -219,7 +240,8 @@ function local_info(state::DenseState{T}) where T
 
     # For batch_size=1, the API may not include a batch dimension,
     # so we add it for consistency with Python
-    if state.batch_size == 1 && length(shape) == length(state.hilbert_space_dims) * (ispure(state) ? 1 : 2)
+    if state.batch_size == 1 &&
+       length(shape) == length(state.hilbert_space_dims) * (ispure(state) ? 1 : 2)
         shape = (shape..., 1)
         offs = (offs..., 0)
     end
@@ -235,17 +257,19 @@ end
 Attach a GPU buffer to the state. The buffer must be F-contiguous and
 match the required storage size.
 """
-function attach_storage!(state::DenseState{T}, data::CUDA.CuVector{T}) where T
+function attach_storage!(state::DenseState{T}, data::CUDA.CuVector{T}) where {T}
     _check_state_valid(state)
     expected_size = storage_size(state)
-    length(data) >= expected_size || error(
-        "Buffer size $(length(data)) < required $(expected_size)"
-    )
+    length(data) >= expected_size ||
+        error("Buffer size $(length(data)) < required $(expected_size)")
     buf_ptrs = [pointer(data)]
-    buf_sizes = Csize_t[length(data) * sizeof(T)]
+    buf_sizes = Csize_t[length(data)*sizeof(T)]
     cudensitymatStateAttachComponentStorage(
-        state.ws.handle, state.handle,
-        Int32(1), buf_ptrs, buf_sizes
+        state.ws.handle,
+        state.handle,
+        Int32(1),
+        buf_ptrs,
+        buf_sizes,
     )
     state.storage = data
     state._owns_storage = false
@@ -257,7 +281,7 @@ end
 
 Allocate an appropriately sized buffer and attach it to the state.
 """
-function allocate_storage!(state::DenseState{T}) where T
+function allocate_storage!(state::DenseState{T}) where {T}
     _check_state_valid(state)
     sz = storage_size(state)
     buf = CUDA.zeros(T, sz)
@@ -271,7 +295,7 @@ end
 
 Return a multidimensional view of the state's storage buffer.
 """
-function state_view(state::DenseState{T}) where T
+function state_view(state::DenseState{T}) where {T}
     _check_state_valid(state)
     state.storage === nothing && error("No storage attached")
     shape, _ = local_info(state)
@@ -286,10 +310,7 @@ Set all elements of the state to zero using the C API.
 """
 function initialize_zero!(state::AbstractState)
     _check_state_valid(state)
-    cudensitymatStateInitializeZero(
-        state.ws.handle, state.handle,
-        CUDA.stream().handle
-    )
+    cudensitymatStateInitializeZero(state.ws.handle, state.handle, CUDA.stream().handle)
     return nothing
 end
 
@@ -302,13 +323,14 @@ Scale the state by scalar factor(s).
 
 `factors` can be a scalar, a Vector, or a CuVector of length `batch_size`.
 """
-function inplace_scale!(state::DenseState{T}, factors) where T
+function inplace_scale!(state::DenseState{T}, factors) where {T}
     _check_state_valid(state)
     factors_gpu = _prepare_factors(state, factors)
     cudensitymatStateComputeScaling(
-        state.ws.handle, state.handle,
+        state.ws.handle,
+        state.handle,
         pointer(factors_gpu),
-        CUDA.stream().handle
+        CUDA.stream().handle,
     )
     CUDA.synchronize()
     return nothing
@@ -319,14 +341,15 @@ end
 
 Compute the squared Frobenius norm(s). Returns a CPU vector of length `batch_size`.
 """
-function norm(state::DenseState{T}) where T
+function norm(state::DenseState{T}) where {T}
     _check_state_valid(state)
     RT = real_eltype(T)
     result = CUDA.zeros(RT, state.batch_size)
     cudensitymatStateComputeNorm(
-        state.ws.handle, state.handle,
+        state.ws.handle,
+        state.handle,
         pointer(result),
-        CUDA.stream().handle
+        CUDA.stream().handle,
     )
     CUDA.synchronize()
     return Array(result)
@@ -337,13 +360,14 @@ end
 
 Compute the trace(s). Returns a CPU vector of length `batch_size`.
 """
-function trace(state::DenseState{T}) where T
+function trace(state::DenseState{T}) where {T}
     _check_state_valid(state)
     result = CUDA.zeros(T, state.batch_size)
     cudensitymatStateComputeTrace(
-        state.ws.handle, state.handle,
+        state.ws.handle,
+        state.handle,
         pointer(result),
-        CUDA.stream().handle
+        CUDA.stream().handle,
     )
     CUDA.synchronize()
     return Array(result)
@@ -354,14 +378,19 @@ end
 
 Accumulate: `dest += factors * src`. Both states must be compatible.
 """
-function inplace_accumulate!(dest::DenseState{T}, src::DenseState{T},
-                             factors=one(T)) where T
+function inplace_accumulate!(
+    dest::DenseState{T},
+    src::DenseState{T},
+    factors = one(T),
+) where {T}
     _check_state_compatibility(dest, src)
     factors_gpu = _prepare_factors(dest, factors)
     cudensitymatStateComputeAccumulation(
-        dest.ws.handle, src.handle, dest.handle,
+        dest.ws.handle,
+        src.handle,
+        dest.handle,
         pointer(factors_gpu),
-        CUDA.stream().handle
+        CUDA.stream().handle,
     )
     CUDA.synchronize()
     return nothing
@@ -372,13 +401,15 @@ end
 
 Compute inner product(s) ⟨left|right⟩. Returns a CPU vector of length `batch_size`.
 """
-function inner_product(left::DenseState{T}, right::DenseState{T}) where T
+function inner_product(left::DenseState{T}, right::DenseState{T}) where {T}
     _check_state_compatibility(left, right)
     result = CUDA.zeros(T, left.batch_size)
     cudensitymatStateComputeInnerProduct(
-        left.ws.handle, left.handle, right.handle,
+        left.ws.handle,
+        left.handle,
+        right.handle,
         pointer(result),
-        CUDA.stream().handle
+        CUDA.stream().handle,
     )
     CUDA.synchronize()
     return Array(result)
@@ -391,29 +422,31 @@ end
 
 Clone a state with a new storage buffer.
 """
-function clone(state::DensePureState{T}, buf::CUDA.CuVector{T}) where T
-    new_state = DensePureState{T}(state.ws, state.hilbert_space_dims;
-                                  batch_size=state.batch_size)
+function clone(state::DensePureState{T}, buf::CUDA.CuVector{T}) where {T}
+    new_state =
+        DensePureState{T}(state.ws, state.hilbert_space_dims; batch_size = state.batch_size)
     attach_storage!(new_state, buf)
     return new_state
 end
 
-function clone(state::DenseMixedState{T}, buf::CUDA.CuVector{T}) where T
-    new_state = DenseMixedState{T}(state.ws, state.hilbert_space_dims;
-                                   batch_size=state.batch_size)
+function clone(state::DenseMixedState{T}, buf::CUDA.CuVector{T}) where {T}
+    new_state = DenseMixedState{T}(
+        state.ws,
+        state.hilbert_space_dims;
+        batch_size = state.batch_size,
+    )
     attach_storage!(new_state, buf)
     return new_state
 end
 
 # --- Internal helpers ---
 
-function _prepare_factors(state::DenseState{T}, factors) where T
+function _prepare_factors(state::DenseState{T}, factors) where {T}
     if factors isa Number
         return CUDA.fill(T(factors), state.batch_size)
     elseif factors isa AbstractVector
-        length(factors) == state.batch_size || error(
-            "factors length $(length(factors)) != batch_size $(state.batch_size)"
-        )
+        length(factors) == state.batch_size ||
+            error("factors length $(length(factors)) != batch_size $(state.batch_size)")
         if factors isa CUDA.CuVector{T}
             return factors
         else
@@ -424,7 +457,7 @@ function _prepare_factors(state::DenseState{T}, factors) where T
     end
 end
 
-function _check_state_compatibility(a::AbstractState{T}, b::AbstractState{T}) where T
+function _check_state_compatibility(a::AbstractState{T}, b::AbstractState{T}) where {T}
     typeof(a) == typeof(b) || error("State types must match: $(typeof(a)) vs $(typeof(b))")
     a.hilbert_space_dims == b.hilbert_space_dims || error("Hilbert space dims must match")
     a.batch_size == b.batch_size || error("Batch sizes must match")

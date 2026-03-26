@@ -14,7 +14,7 @@ function _spectrum_supported()
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
         op = CuDensityMat.create_operator(ws, dims)
-        CuDensityMat.append_term!(op, term; duality=0)
+        CuDensityMat.append_term!(op, term; duality = 0)
         spec = CuDensityMat.create_operator_spectrum(ws, op)
         CuDensityMat.destroy_operator_spectrum(spec)
         close(ws)
@@ -46,11 +46,14 @@ const SPECTRUM_SUPPORTED = _spectrum_supported()
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
         operator = CuDensityMat.create_operator(ws, dims)
-        CuDensityMat.append_term!(operator, term; duality=0)
+        CuDensityMat.append_term!(operator, term; duality = 0)
 
-        spec = CuDensityMat.create_operator_spectrum(ws, operator;
-            is_hermitian=true,
-            spectrum_kind=CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_LARGEST)
+        spec = CuDensityMat.create_operator_spectrum(
+            ws,
+            operator;
+            is_hermitian = true,
+            spectrum_kind = CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_LARGEST,
+        )
         @test isopen(spec)
         CuDensityMat.destroy_operator_spectrum(spec)
         @test !isopen(spec)
@@ -68,15 +71,23 @@ const SPECTRUM_SUPPORTED = _spectrum_supported()
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
         operator = CuDensityMat.create_operator(ws, dims)
-        CuDensityMat.append_term!(operator, term; duality=0)
+        CuDensityMat.append_term!(operator, term; duality = 0)
 
         spec = CuDensityMat.create_operator_spectrum(ws, operator)
         # Configure max restarts
-        CuDensityMat.configure_spectrum!(ws, spec,
-            CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_CONFIG_MAX_RESTARTS, 30)
+        CuDensityMat.configure_spectrum!(
+            ws,
+            spec,
+            CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_CONFIG_MAX_RESTARTS,
+            30,
+        )
         # Configure max expansion
-        CuDensityMat.configure_spectrum!(ws, spec,
-            CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_CONFIG_MAX_EXPANSION, 10)
+        CuDensityMat.configure_spectrum!(
+            ws,
+            spec,
+            CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_CONFIG_MAX_EXPANSION,
+            10,
+        )
         @test true  # no error means success
 
         CuDensityMat.destroy_operator_spectrum(spec)
@@ -95,29 +106,39 @@ const SPECTRUM_SUPPORTED = _spectrum_supported()
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
         operator = CuDensityMat.create_operator(ws, dims)
-        CuDensityMat.append_term!(operator, term; duality=0)
+        CuDensityMat.append_term!(operator, term; duality = 0)
 
-        spec = CuDensityMat.create_operator_spectrum(ws, operator;
-            is_hermitian=true,
-            spectrum_kind=CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_LARGEST)
+        spec = CuDensityMat.create_operator_spectrum(
+            ws,
+            operator;
+            is_hermitian = true,
+            spectrum_kind = CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_LARGEST,
+        )
 
         # Template state for Hilbert space structure
-        template = DensePureState{T}(ws, (2,); batch_size=1)
+        template = DensePureState{T}(ws, (2,); batch_size = 1)
         CuDensityMat.allocate_storage!(template)
 
         # Prepare for 1 eigenstate
         CuDensityMat.prepare_spectrum!(ws, spec, 1, template)
 
         # Eigenstate to receive result
-        eigenstate = DensePureState{T}(ws, (2,); batch_size=1)
+        eigenstate = DensePureState{T}(ws, (2,); batch_size = 1)
         CuDensityMat.allocate_storage!(eigenstate)
 
         # Eigenvalue storage (real for Hermitian)
         eigenvalues = CUDA.zeros(Float64, 1)
 
         # Compute
-        tolerances = CuDensityMat.compute_spectrum!(ws, spec, 1, [eigenstate], eigenvalues;
-            time=0.0, batch_size=1)
+        tolerances = CuDensityMat.compute_spectrum!(
+            ws,
+            spec,
+            1,
+            [eigenstate],
+            eigenvalues;
+            time = 0.0,
+            batch_size = 1,
+        )
 
         evals = Array(eigenvalues)
         # Largest eigenvalue of sigma_z should be +1
@@ -139,22 +160,32 @@ const SPECTRUM_SUPPORTED = _spectrum_supported()
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
         operator = CuDensityMat.create_operator(ws, dims)
-        CuDensityMat.append_term!(operator, term; duality=0)
+        CuDensityMat.append_term!(operator, term; duality = 0)
 
-        spec = CuDensityMat.create_operator_spectrum(ws, operator;
-            is_hermitian=true,
-            spectrum_kind=CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_SMALLEST)
+        spec = CuDensityMat.create_operator_spectrum(
+            ws,
+            operator;
+            is_hermitian = true,
+            spectrum_kind = CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_SMALLEST,
+        )
 
-        template = DensePureState{T}(ws, (2,); batch_size=1)
+        template = DensePureState{T}(ws, (2,); batch_size = 1)
         CuDensityMat.allocate_storage!(template)
         CuDensityMat.prepare_spectrum!(ws, spec, 1, template)
 
-        eigenstate = DensePureState{T}(ws, (2,); batch_size=1)
+        eigenstate = DensePureState{T}(ws, (2,); batch_size = 1)
         CuDensityMat.allocate_storage!(eigenstate)
         eigenvalues = CUDA.zeros(Float64, 1)
 
-        tolerances = CuDensityMat.compute_spectrum!(ws, spec, 1, [eigenstate], eigenvalues;
-            time=0.0, batch_size=1)
+        tolerances = CuDensityMat.compute_spectrum!(
+            ws,
+            spec,
+            1,
+            [eigenstate],
+            eigenvalues;
+            time = 0.0,
+            batch_size = 1,
+        )
 
         evals = Array(eigenvalues)
         # Smallest eigenvalue of sigma_z should be -1

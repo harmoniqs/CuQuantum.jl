@@ -18,7 +18,7 @@
 
     @gpu_test "explicit stream" begin
         s = CUDA.CuStream()
-        ws = WorkStream(stream=s)
+        ws = WorkStream(stream = s)
         @test isopen(ws)
         @test ws.stream === s
         close(ws)

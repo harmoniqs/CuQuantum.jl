@@ -37,7 +37,7 @@
             end
         end
 
-        cb, gcb, refs = CuDensityMat.wrap_scalar_callback(my_coeff; gradient=my_grad)
+        cb, gcb, refs = CuDensityMat.wrap_scalar_callback(my_coeff; gradient = my_grad)
         @test cb.callback != C_NULL
         @test gcb.callback != C_NULL
         @test gcb.wrapper != C_NULL
@@ -110,14 +110,18 @@
 
         # Assemble operator with time-dependent coefficient callback
         operator = CuDensityMat.create_operator(ws, dims)
-        CuDensityMat.append_term!(operator, term;
-            duality=0, coefficient=1.0+0im,
-            coefficient_callback=cb,
-            coefficient_gradient_callback=gcb)
+        CuDensityMat.append_term!(
+            operator,
+            term;
+            duality = 0,
+            coefficient = 1.0+0im,
+            coefficient_callback = cb,
+            coefficient_gradient_callback = gcb,
+        )
 
         # Create states
-        psi_in = DenseMixedState{T}(ws, (2,); batch_size=1)
-        psi_out = DenseMixedState{T}(ws, (2,); batch_size=1)
+        psi_in = DenseMixedState{T}(ws, (2,); batch_size = 1)
+        psi_out = DenseMixedState{T}(ws, (2,); batch_size = 1)
         CuDensityMat.allocate_storage!(psi_in)
         CuDensityMat.allocate_storage!(psi_out)
 
@@ -130,8 +134,16 @@
         # Compute at t=0.5 with param Ω=2.0
         CuDensityMat.initialize_zero!(psi_out)
         params = CUDA.CuVector{Float64}([2.0])  # Ω = 2.0
-        CuDensityMat.compute_operator_action!(ws, operator, psi_in, psi_out;
-            time=0.5, batch_size=1, num_params=1, params=params)
+        CuDensityMat.compute_operator_action!(
+            ws,
+            operator,
+            psi_in,
+            psi_out;
+            time = 0.5,
+            batch_size = 1,
+            num_params = 1,
+            params = params,
+        )
 
         result = Array(psi_out.storage)
         @test any(x -> abs(x) > 0, result)
@@ -164,20 +176,24 @@
 
         # Create elementary op with callback (pass zeros for initial static data)
         static_data = CUDA.zeros(T, 4)
-        elem = CuDensityMat.create_elementary_operator(ws, [2], static_data;
-            tensor_callback=tensor_cb,
-            tensor_gradient_callback=tensor_gcb)
+        elem = CuDensityMat.create_elementary_operator(
+            ws,
+            [2],
+            static_data;
+            tensor_callback = tensor_cb,
+            tensor_gradient_callback = tensor_gcb,
+        )
 
         # Build operator
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
 
         operator = CuDensityMat.create_operator(ws, dims)
-        CuDensityMat.append_term!(operator, term; duality=0)
+        CuDensityMat.append_term!(operator, term; duality = 0)
 
         # States
-        psi_in = DenseMixedState{T}(ws, (2,); batch_size=1)
-        psi_out = DenseMixedState{T}(ws, (2,); batch_size=1)
+        psi_in = DenseMixedState{T}(ws, (2,); batch_size = 1)
+        psi_out = DenseMixedState{T}(ws, (2,); batch_size = 1)
         CuDensityMat.allocate_storage!(psi_in)
         CuDensityMat.allocate_storage!(psi_out)
         copyto!(psi_in.storage, CUDA.CuVector{T}([1.0, 0.0, 0.0, 0.0]))
@@ -185,8 +201,14 @@
         # Prepare + compute
         CuDensityMat.prepare_operator_action!(ws, operator, psi_in, psi_out)
         CuDensityMat.initialize_zero!(psi_out)
-        CuDensityMat.compute_operator_action!(ws, operator, psi_in, psi_out;
-            time=0.3, batch_size=1)
+        CuDensityMat.compute_operator_action!(
+            ws,
+            operator,
+            psi_in,
+            psi_out;
+            time = 0.3,
+            batch_size = 1,
+        )
 
         result = Array(psi_out.storage)
         @test any(x -> abs(x) > 0, result)

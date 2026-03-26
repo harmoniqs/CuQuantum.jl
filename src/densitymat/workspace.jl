@@ -28,10 +28,10 @@ mutable struct WorkStream
     workspace::cudensitymatWorkspaceDescriptor_t
     stream::CUDA.CuStream
     device_id::Int
-    memory_limit::Union{Nothing, Int}
+    memory_limit::Union{Nothing,Int}
 
     # Workspace buffer (managed CuVector for scratch space)
-    workspace_buffer::Union{Nothing, CUDA.CuVector{UInt8}}
+    workspace_buffer::Union{Nothing,CUDA.CuVector{UInt8}}
     workspace_size::Int
 
     # Communicator state
@@ -41,9 +41,9 @@ mutable struct WorkStream
     _comm_ref::Any
 
     function WorkStream(;
-        stream::Union{Nothing, CUDA.CuStream}=nothing,
-        memory_limit::Union{Nothing, Int}=nothing,
-        device_id::Union{Nothing, Int}=nothing,
+        stream::Union{Nothing,CUDA.CuStream} = nothing,
+        memory_limit::Union{Nothing,Int} = nothing,
+        device_id::Union{Nothing,Int} = nothing,
     )
         dev = if device_id !== nothing
             CUDA.device!(device_id)
@@ -62,8 +62,18 @@ mutable struct WorkStream
         cudensitymatCreateWorkspace(h, ws_ref)
         ws = ws_ref[]
 
-        obj = new(h, ws, s, dev, memory_limit, nothing, 0,
-                  CUDENSITYMAT_DISTRIBUTED_PROVIDER_NONE, false, nothing)
+        obj = new(
+            h,
+            ws,
+            s,
+            dev,
+            memory_limit,
+            nothing,
+            0,
+            CUDENSITYMAT_DISTRIBUTED_PROVIDER_NONE,
+            false,
+            nothing,
+        )
 
         # Register finalizer
         finalizer(obj) do x
@@ -134,9 +144,12 @@ set_communicator!(ws, :mpi;
     comm_size=sizeof(MPI.MPI_Comm))
 ```
 """
-function set_communicator!(ws::WorkStream, provider::Symbol;
-                           comm_ptr::Union{Nothing, Ptr{Cvoid}, Integer}=nothing,
-                           comm_size::Union{Nothing, Integer}=nothing)
+function set_communicator!(
+    ws::WorkStream,
+    provider::Symbol;
+    comm_ptr::Union{Nothing,Ptr{Cvoid},Integer} = nothing,
+    comm_size::Union{Nothing,Integer} = nothing,
+)
     _check_valid(ws)
 
     if ws.comm_set
@@ -211,9 +224,11 @@ end
 
 Query the required workspace buffer size in bytes after a `prepare` call.
 """
-function workspace_query_size(ws::WorkStream;
-                              memspace::Symbol=:device,
-                              kind::Symbol=:scratch)
+function workspace_query_size(
+    ws::WorkStream;
+    memspace::Symbol = :device,
+    kind::Symbol = :scratch,
+)
     _check_valid(ws)
     ms = memspace == :device ? CUDENSITYMAT_MEMSPACE_DEVICE : CUDENSITYMAT_MEMSPACE_HOST
     wk = CUDENSITYMAT_WORKSPACE_SCRATCH  # only scratch is supported
@@ -227,9 +242,12 @@ end
 
 Allocate and attach a workspace buffer of the given size.
 """
-function workspace_allocate!(ws::WorkStream, size::Int;
-                             memspace::Symbol=:device,
-                             kind::Symbol=:scratch)
+function workspace_allocate!(
+    ws::WorkStream,
+    size::Int;
+    memspace::Symbol = :device,
+    kind::Symbol = :scratch,
+)
     _check_valid(ws)
     size <= 0 && return nothing
 
@@ -250,9 +268,14 @@ function workspace_allocate!(ws::WorkStream, size::Int;
 
     # Attach to workspace descriptor
     buf_ptr = pointer(ws.workspace_buffer)
-    cudensitymatWorkspaceSetMemory(ws.handle, ws.workspace, ms, wk,
-                                   reinterpret(CuPtr{Cvoid}, buf_ptr),
-                                   Csize_t(size))
+    cudensitymatWorkspaceSetMemory(
+        ws.handle,
+        ws.workspace,
+        ms,
+        wk,
+        reinterpret(CuPtr{Cvoid}, buf_ptr),
+        Csize_t(size),
+    )
     return nothing
 end
 

@@ -8,8 +8,12 @@ end
 
 Base.convert(::Type{cudensitymatStatus_t}, err::CUDENSITYMATError) = err.code
 
-Base.showerror(io::IO, err::CUDENSITYMATError) =
-    print(io, "CUDENSITYMATError: ", description(err), " (code $(reinterpret(Int32, err.code)), $(err.code))")
+Base.showerror(io::IO, err::CUDENSITYMATError) = print(
+    io,
+    "CUDENSITYMATError: ",
+    description(err),
+    " (code $(reinterpret(Int32, err.code)), $(err.code))",
+)
 
 function description(err::CUDENSITYMATError)
     if err.code == CUDENSITYMAT_STATUS_SUCCESS
@@ -68,9 +72,11 @@ function throw_api_error(res)
 end
 
 @inline function check(f)
-    retry_if(res) = res in (CUDENSITYMAT_STATUS_NOT_INITIALIZED,
-                            CUDENSITYMAT_STATUS_ALLOC_FAILED,
-                            CUDENSITYMAT_STATUS_INTERNAL_ERROR)
+    retry_if(res) = res in (
+        CUDENSITYMAT_STATUS_NOT_INITIALIZED,
+        CUDENSITYMAT_STATUS_ALLOC_FAILED,
+        CUDENSITYMAT_STATUS_INTERNAL_ERROR,
+    )
     res = retry_reclaim(f, retry_if)
 
     if res != CUDENSITYMAT_STATUS_SUCCESS
