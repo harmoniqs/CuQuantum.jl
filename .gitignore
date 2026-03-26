@@ -1,0 +1,21 @@
+# Julia artifacts
+Manifest.toml
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+deps/build.log
+
+# Generated output
+gen/output/
+trajectory.csv
+benchmark_results*.csv
+
+# Editor/OS
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+
+# Compiled
+*.ji

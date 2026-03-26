@@ -1,0 +1,24 @@
+name = "CuQuantum"
+uuid = "fc340f4a-ac26-4dfb-b247-6d4fbb695c9a"
+version = "0.1.0"
+authors = ["Jack Champagne <jack@harmoniqs.co>"]
+
+[deps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+CUDA_Runtime_Discovery = "1af6417a-86b4-443c-805f-a4643ffb695f"
+CEnum = "fa961155-64e5-5f13-b03f-caf6b980ea82"
+cuQuantum_jll = "b75408ef-6fdf-5d74-b65a-7df000ad18e6"
+
+[compat]
+CUDA = "5"
+CUDA_Runtime_Discovery = "0.3"
+CEnum = "0.4, 0.5"
+cuQuantum_jll = "24, 25"
+julia = "1.10"
+
+[extras]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test", "LinearAlgebra"]
