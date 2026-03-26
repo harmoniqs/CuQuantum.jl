@@ -49,4 +49,4 @@ Every CuQuantum.jl simulation follows this pattern:
 6. **Compute** — evaluate ``L[\rho]`` at a given time, as many times as needed
 7. **Clean up** — close the `WorkStream`
 
-See the [Concepts](@ref) section for detailed explanations of each step.
+See the [Concepts Overview](@ref) section for detailed explanations of each step.
