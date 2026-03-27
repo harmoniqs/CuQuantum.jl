@@ -12,36 +12,42 @@ Initial state: ``|1,0,\ldots,0\rangle\langle 1,0,\ldots,0|``.
 
 ## A100 Comparison: CuQuantum.jl vs QuantumToolbox.jl
 
-Same hardware, same problem. NVIDIA A100-SXM4-40GB, 12 vCPUs, 85 GB RAM.
+Same hardware, same problem, same RK4 integrator. NVIDIA A100-SXM4-40GB, 12 vCPUs, 85 GB RAM.
 
-### Full Simulation (100 steps)
+### Full Simulation: 100-step RK4
 
-cuDensityMat uses fixed-step RK4 (``\Delta t = 0.01``). QuantumToolbox.jl uses DP5 adaptive (``\text{atol}=10^{-8}``, ``\text{rtol}=10^{-6}``).
+All use fixed-step RK4 (``\Delta t = 0.01``). CuQuantum.jl uses cuDensityMat tensor network contraction. QT.jl GPU uses cuSPARSE SpMV on the materialized Liouvillian. QT.jl CPU uses DP5 adaptive (``\text{atol}=10^{-8}``, ``\text{rtol}=10^{-6}``).
 
-| Cavities (M) | Hilbert dim | CuQuantum.jl (GPU) | QT.jl CPU | QT.jl GPU |
+| Cavities (M) | Hilbert dim | CuQuantum.jl (GPU) | QT.jl GPU (cuSPARSE RK4) | QT.jl CPU (DP5) |
 |:---:|:---:|:---:|:---:|:---:|
-| 2 | 9 | 0.121 s | **0.0004 s** | ✗ |
-| 4 | 81 | 0.434 s | **0.021 s** | ✗ |
-| 6 | 729 | **2.61 s** | 5.89 s | ✗ |
-| 8 | 6,561 | **249.8 s** | — | — |
+| 2 | 9 | 0.133 s | 0.018 s | **0.0004 s** |
+| 4 | 81 | 0.462 s | **0.018 s** | 0.021 s |
+| 6 | 729 | 2.62 s | **0.32 s** | 5.89 s |
+| 8 | 6,561 | **250 s** | — | — |
 
-At M=6, CuQuantum.jl on A100 is **2.3× faster** than QuantumToolbox.jl CPU. At M=8, CPU sparse is infeasible — only cuDensityMat can run.
+At M=6, cuSPARSE RK4 is **8.1× faster** than cuDensityMat and **18× faster** than CPU. At M=8, the sparse Liouvillian would require ~77 GB — only cuDensityMat's tensor network approach can run.
 
 ### Single Liouvillian Action ``L[\rho]``
 
 | Cavities (M) | Hilbert dim | CuQuantum.jl | QT.jl GPU (cuSPARSE) | Speedup |
 |:---:|:---:|:---:|:---:|:---:|
-| 2 | 9 | 0.282 ms | **0.037 ms** | cuSPARSE 7.6× |
-| 4 | 81 | 1.22 ms | **0.047 ms** | cuSPARSE 26× |
-| 6 | 729 | 8.14 ms | **0.901 ms** | cuSPARSE 9.0× |
+| 2 | 9 | 0.267 ms | **0.039 ms** | cuSPARSE 6.8× |
+| 4 | 81 | 1.22 ms | **0.048 ms** | cuSPARSE 25× |
+| 6 | 729 | 6.45 ms | **0.902 ms** | cuSPARSE 7.2× |
 | 8 | 6,561 | 620 ms | — | GPU only |
 
-QuantumToolbox.jl's cuSPARSE SpMV is faster per-action because it materializes the Liouvillian as a sparse matrix and does a single SpMV call. cuDensityMat uses tensor network contraction — higher per-action overhead but never forms the superoperator, enabling M=8+ where sparse is impossible.
+cuSPARSE SpMV is faster per-action because it does a single sparse matrix-vector multiply on the pre-built Liouvillian. cuDensityMat uses tensor network contraction — higher per-action overhead but never forms the full superoperator, enabling M=8+ where sparse is infeasible.
+
+### Implications
+
+For **M ≤ 6** (Hilbert dim ≤ 729): cuSPARSE GPU is the fastest approach. Build the Liouvillian once, then SpMV is extremely cheap. This is the regime relevant to dual-rail qubit optimal control.
+
+For **M ≥ 8** (Hilbert dim ≥ 6,561): cuDensityMat is the **only viable GPU option**. The sparse Liouvillian exceeds GPU memory, but cuDensityMat's tensor contraction scales without materializing it.
 
 ### Notes
 
-- **QT.jl GPU mesolve (✗)**: QuantumToolbox.jl GPU `mesolve` fails on both T4 (sm\_75) and A100 (sm\_80) with a PTX compilation error (`.NaN` modifier in the DP5 kernel). This appears to be a bug in the CUDA.jl/OrdinaryDiffEq.jl GPU codegen, not a hardware limitation. Single-action cuSPARSE benchmarks work fine.
-- **M=8 CPU**: the sparse Liouvillian for M=8 (D=6,561) would be a 43M × 43M matrix requiring >100 GB. Only cuDensityMat's tensor network approach can handle this.
+- **M=2 QT.jl GPU anomaly** (0.84s in first run, shown as 0.018s above): the first RK4 call includes CUDA kernel JIT compilation for `axpy!`/`mul!`. The 0.018s figure is from a second run where kernels are cached. The CuQuantum.jl numbers also exclude first-call JIT.
+- **M=8 cuSPARSE**: the Liouvillian is ``D^2 \times D^2 = 43\text{M} \times 43\text{M}`` sparse. Even with ~3B non-zeros at 24 bytes each, it would need ~77 GB — exceeds the A100's 40 GB.
 
 ## Cross-Framework Comparison (Tesla T4)
 

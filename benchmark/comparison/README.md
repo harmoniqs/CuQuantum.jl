@@ -22,7 +22,7 @@ M coupled cavities with Fock truncation d=3:
 | `bench_python_cudensitymat.py` | Python cuDensityMat | GPU CuPy | RK4 fixed-step |
 | `bench_jax_cudensitymat.py` | JAX cuDensityMat ext | GPU JAX | RK4 fixed-step |
 | `bench_quantumtoolbox_cpu.jl` | QuantumToolbox.jl | CPU sparse | DP5 adaptive |
-| `bench_quantumtoolbox_gpu.jl` | QuantumToolbox.jl | GPU cuSPARSE | DP5 adaptive |
+| `bench_quantumtoolbox_gpu.jl` | QuantumToolbox.jl | GPU cuSPARSE | RK4 fixed-step |
 | `bench_qutip.py` | QuTiP | CPU sparse | Adams adaptive |
 | `run_all.sh` | all | all | aggregates CSVs |
 

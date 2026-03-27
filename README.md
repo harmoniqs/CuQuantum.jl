@@ -58,14 +58,13 @@ close(ws)
 
 cuDensityMat uses tensor network contraction to compute operator actions without materializing the full Liouvillian superoperator. This enables simulation of systems too large for sparse matrix approaches.
 
-### A100: CuQuantum.jl vs QuantumToolbox.jl (100-step simulation)
+### A100: 100-step RK4 Simulation
 
-| Cavities | Hilbert dim | CuQuantum.jl (A100) | QT.jl CPU | Winner |
+| Cavities | Hilbert dim | CuQuantum.jl | QT.jl GPU (cuSPARSE) | QT.jl CPU |
 |:---:|:---:|:---:|:---:|:---:|
-| 2 | 9 | 0.12 s | **0.0004 s** | CPU |
-| 4 | 81 | 0.43 s | **0.02 s** | CPU |
-| **6** | **729** | **2.6 s** | 5.9 s | **GPU 2.3×** |
-| **8** | **6,561** | **250 s** | — | **GPU only** |
+| 4 | 81 | 0.46 s | **0.018 s** | 0.02 s |
+| **6** | **729** | 2.62 s | **0.32 s** | 5.9 s |
+| **8** | **6,561** | **250 s** | — | — |
 
 ### Cross-Framework: 100-step Lindblad Simulation (Tesla T4)
 
