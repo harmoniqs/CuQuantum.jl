@@ -1,0 +1,10 @@
+[general]
+library_name = "libcudensitymat"
+output_file_path = "output/libcudensitymat.jl"
+module_name = "LibCuDensityMat"
+jll_pkg_name = "cuQuantum_jll"
+export_symbol_prefixes = ["cudensitymat"]
+
+[codegen]
+use_ccall_macro = true
+wrap_structs = true
