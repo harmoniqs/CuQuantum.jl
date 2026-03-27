@@ -1,8 +1,6 @@
 # Quantum States
 
-## State Types
-
-CuQuantum.jl provides two state types, both stored as dense tensors on the GPU:
+CuQuantum.jl provides two state types, both stored as dense tensors on the GPU.
 
 ### `DensePureState{T}`
 
@@ -76,11 +74,11 @@ The batch dimension is the last index in storage. All compute functions (`trace`
 
 ## Memory Management
 
-State storage is allocated on the GPU via `allocate_storage!`. The GPU memory is released when the state is garbage collected, or when the `WorkStream` is closed.
+State storage is allocated on the GPU via `allocate_storage!`. GPU memory is released when the `WorkStream` is closed.
 
 ```julia
 ρ = DenseMixedState{ComplexF64}(ws, (3, 3); batch_size=1)
-allocate_storage!(ρ)  # allocates 9*9*16 = 1296 bytes on GPU
+allocate_storage!(ρ)
 # ... use ρ ...
-close(ws)  # releases all associated GPU resources
+close(ws)
 ```

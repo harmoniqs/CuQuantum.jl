@@ -41,12 +41,12 @@ println("CuQuantum.jl is working!")
 
 Every CuQuantum.jl simulation follows this pattern:
 
-1. **Create a `WorkStream`** — manages the GPU handle, workspace memory, and CUDA stream
-2. **Define elementary operators** — single-mode operators (e.g., annihilation, number, Pauli matrices) uploaded to GPU
+1. **Create a [`WorkStream`](@ref)** — manages the GPU handle, workspace memory, and CUDA stream
+2. **Define elementary operators** — single-mode operators (annihilation, number, Pauli) uploaded to GPU
 3. **Build operator terms** — tensor products of elementary operators acting on specific modes
-4. **Assemble the composite operator** — sum of terms with coefficients and duality flags (left/right of ``\rho``)
+4. **Assemble the composite operator** — sum of terms with coefficients and duality flags
 5. **Prepare the action** — one-time workspace allocation and contraction planning
 6. **Compute** — evaluate ``L[\rho]`` at a given time, as many times as needed
-7. **Clean up** — close the `WorkStream`
+7. **Clean up** — `close(ws)`
 
-See the [Concepts Overview](@ref) section for detailed explanations of each step.
+See the [Concepts](@ref "Concepts Overview") section for details on each step.
