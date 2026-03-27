@@ -29,7 +29,7 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
-      - uses: julia-actions/cache@v2
+      - uses: julia-actions/cache@v3
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         # GPU-requiring tests are skipped automatically via @gpu_test / @test_skip.
@@ -47,7 +47,7 @@ jobs:
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1.12'
-      - uses: julia-actions/cache@v2
+      - uses: julia-actions/cache@v3
       - uses: julia-actions/julia-buildpkg@v1
       # Placeholder: swap ubuntu-latest for a self-hosted GPU runner label
       # (e.g. runs-on: [self-hosted, gpu, linux]) to actually run GPU tests.
