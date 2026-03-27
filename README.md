@@ -58,23 +58,24 @@ close(ws)
 
 cuDensityMat uses tensor network contraction to compute operator actions without materializing the full Liouvillian superoperator. This enables simulation of systems too large for sparse matrix approaches.
 
-### Single Liouvillian Action (A100 40GB)
+### A100: CuQuantum.jl vs QuantumToolbox.jl (100-step simulation)
 
-| Cavities | Hilbert dim | cuDensityMat (A100) | CPU Sparse |
-|:---:|:---:|:---:|:---:|
-| 6 | 729 | **8 ms** | 40 ms |
-| 8 | 6,561 | **621 ms** | infeasible |
-| 9 | 19,683 | **6.7 s** | infeasible |
+| Cavities | Hilbert dim | CuQuantum.jl (A100) | QT.jl CPU | Winner |
+|:---:|:---:|:---:|:---:|:---:|
+| 2 | 9 | 0.12 s | **0.0004 s** | CPU |
+| 4 | 81 | 0.43 s | **0.02 s** | CPU |
+| **6** | **729** | **2.6 s** | 5.9 s | **GPU 2.3×** |
+| **8** | **6,561** | **250 s** | — | **GPU only** |
 
 ### Cross-Framework: 100-step Lindblad Simulation (Tesla T4)
 
-| Cavities | Hilbert dim | CuQuantum.jl | Python cuDensityMat | JAX cuDensityMat | QuantumToolbox.jl CPU | QuTiP CPU |
+| Cavities | Hilbert dim | CuQuantum.jl | Python cuDensityMat | JAX cuDensityMat | QT.jl CPU | QuTiP CPU |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 2 | 9 | 0.22 s | 1.36 s | 0.38 s | **0.0003 s** | 0.005 s |
 | 4 | 81 | 1.48 s | 1.01 s | 1.08 s | **0.02 s** | 0.04 s |
 | 6 | 729 | 60.0 s | 64.0 s | 64.4 s | **6.7 s** | 12.3 s |
 
-See the [benchmarks](https://harmoniqs.github.io/CuQuantum.jl/dev/benchmarks/) for the full comparison including environment details and reproduction scripts.
+See the [benchmarks](https://harmoniqs.github.io/CuQuantum.jl/dev/benchmarks/) for the full comparison including A100 vs T4, single-action timings, and reproduction scripts.
 
 ## Documentation
 

@@ -10,22 +10,52 @@ where ``H = \sum_m \chi\, n_m(n_m - 1) + \sum_{n \ne m} \kappa\, a_n^\dagger a_m
 
 Initial state: ``|1,0,\ldots,0\rangle\langle 1,0,\ldots,0|``.
 
+## A100 Comparison: CuQuantum.jl vs QuantumToolbox.jl
+
+Same hardware, same problem. NVIDIA A100-SXM4-40GB, 12 vCPUs, 85 GB RAM.
+
+### Full Simulation (100 steps)
+
+cuDensityMat uses fixed-step RK4 (``\Delta t = 0.01``). QuantumToolbox.jl uses DP5 adaptive (``\text{atol}=10^{-8}``, ``\text{rtol}=10^{-6}``).
+
+| Cavities (M) | Hilbert dim | CuQuantum.jl (GPU) | QT.jl CPU | QT.jl GPU |
+|:---:|:---:|:---:|:---:|:---:|
+| 2 | 9 | 0.121 s | **0.0004 s** | ✗ |
+| 4 | 81 | 0.434 s | **0.021 s** | ✗ |
+| 6 | 729 | **2.61 s** | 5.89 s | ✗ |
+| 8 | 6,561 | **249.8 s** | — | — |
+
+At M=6, CuQuantum.jl on A100 is **2.3× faster** than QuantumToolbox.jl CPU. At M=8, CPU sparse is infeasible — only cuDensityMat can run.
+
+### Single Liouvillian Action ``L[\rho]``
+
+| Cavities (M) | Hilbert dim | CuQuantum.jl | QT.jl GPU (cuSPARSE) | Speedup |
+|:---:|:---:|:---:|:---:|:---:|
+| 2 | 9 | 0.282 ms | **0.037 ms** | cuSPARSE 7.6× |
+| 4 | 81 | 1.22 ms | **0.047 ms** | cuSPARSE 26× |
+| 6 | 729 | 8.14 ms | **0.901 ms** | cuSPARSE 9.0× |
+| 8 | 6,561 | 620 ms | — | GPU only |
+
+QuantumToolbox.jl's cuSPARSE SpMV is faster per-action because it materializes the Liouvillian as a sparse matrix and does a single SpMV call. cuDensityMat uses tensor network contraction — higher per-action overhead but never forms the superoperator, enabling M=8+ where sparse is impossible.
+
+### Notes
+
+- **QT.jl GPU mesolve (✗)**: QuantumToolbox.jl GPU `mesolve` fails on both T4 (sm\_75) and A100 (sm\_80) with a PTX compilation error (`.NaN` modifier in the DP5 kernel). This appears to be a bug in the CUDA.jl/OrdinaryDiffEq.jl GPU codegen, not a hardware limitation. Single-action cuSPARSE benchmarks work fine.
+- **M=8 CPU**: the sparse Liouvillian for M=8 (D=6,561) would be a 43M × 43M matrix requiring >100 GB. Only cuDensityMat's tensor network approach can handle this.
+
 ## Cross-Framework Comparison (Tesla T4)
 
 ### Full Simulation: 100-step RK4 / mesolve
-
-Wall-clock time (seconds) for a full 100-step simulation (``\Delta t = 0.01``, ``t_\text{final} = 1.0``). cuDensityMat benchmarks use fixed-step RK4; QuantumToolbox.jl and QuTiP use adaptive solvers (DP5 / Adams, ``\text{atol}=10^{-8}``, ``\text{rtol}=10^{-6}``).
 
 | Cavities (M) | Hilbert dim | CuQuantum.jl | Python CuPy | JAX ext | QT.jl CPU | QuTiP CPU |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | 2 | 9 | 0.219 s | 1.360 s | 0.382 s | **0.0003 s** | 0.005 s |
 | 4 | 81 | 1.484 s | 1.006 s | 1.076 s | **0.021 s** | 0.043 s |
 | 6 | 729 | 60.0 s | 64.0 s | 64.4 s | **6.67 s** | 12.3 s |
-| 8 | 6,561 | — | — | — | — | — |
 
-### Single Liouvillian Action ``L[\rho]``
+On T4, CPU sparse is faster than cuDensityMat at all tested sizes — the T4's low FP64 throughput (0.25 TFLOPS) cannot overcome the tensor network contraction overhead. cuDensityMat needs an A100-class GPU to win.
 
-Time for a single evaluation of the Liouvillian action (median of 50 trials, after warmup).
+### Single Liouvillian Action ``L[\rho]`` (T4)
 
 | Cavities (M) | Hilbert dim | CuQuantum.jl | Python CuPy | JAX ext | QT.jl GPU (cuSPARSE) | QuTiP CPU |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
@@ -33,34 +63,9 @@ Time for a single evaluation of the Liouvillian action (median of 50 trials, aft
 | 4 | 81 | 4.93 ms | 5.79 ms | 6.00 ms | **0.072 ms** | 14.0 ms |
 | 6 | 729 | **149 ms** | 159 ms | 161 ms | 4.06 ms | OOM |
 
-### Notes
+## Wrapper Overhead
 
-- M=8 is skipped in the comparison: cuDensityMat `prepare_action` takes >15 minutes, and Python operator construction takes >10 minutes due to O(M²) `OperatorTerm.__add__` overhead.
-- QuantumToolbox.jl GPU mesolve could not run on T4 (sm\_75) — the DP5 ODE solver kernel requires sm\_80+ (A100). Single-action benchmarks worked.
-- QuTiP single-action at M=6 failed with OOM (tried to allocate the full dense Liouvillian as a 531,441 × 531,441 matrix).
-
-## CuQuantum.jl vs CPU Sparse (A100)
-
-Earlier benchmarks on NVIDIA A100 40GB show the crossover point where cuDensityMat becomes faster:
-
-| Cavities (M) | Hilbert dim | ``\rho`` elements | cuDensityMat (A100) | CPU Sparse | GPU Speedup |
-|:---:|:---:|:---:|:---:|:---:|:---:|
-| 2 | 9 | 81 | 0.27 ms | 0.001 ms | CPU wins |
-| 4 | 81 | 6,561 | 1.2 ms | 0.14 ms | CPU wins |
-| **6** | **729** | **531K** | **8.1 ms** | **40 ms** | **4.9×** |
-| 8 | 6,561 | 43M | 621 ms | N/A | GPU only |
-| 9 | 19,683 | 387M | 6,742 ms | N/A | GPU only |
-
-### Key Findings
-
-- **Crossover at M=6** (729-dimensional Hilbert space): cuDensityMat on A100 is 4.9× faster than CPU sparse matrix-vector multiply.
-- **Beyond M=6, CPU is infeasible**: the sparse superoperator for M=8 would require >100 GB to construct. cuDensityMat never materializes the superoperator — it uses tensor network contraction.
-- **GPU overhead dominates at small sizes**: for M=2,4, kernel launch overhead (~0.3 ms) exceeds the actual computation time. CPU wins trivially.
-- **On T4, cuDensityMat is slower than CPU sparse even at M=6** — the A100's higher memory bandwidth (2 TB/s vs 300 GB/s) and FP64 throughput (9.7 vs 0.25 TFLOPS) make the difference.
-
-## Wrapper Overhead Comparison
-
-All three cuDensityMat wrappers call the same C library. The wrapper overhead:
+All three cuDensityMat wrappers call the same C library. Wrapper dispatch overhead measured on T4:
 
 | Wrapper | Single L[rho] at M=6 | vs Julia |
 |:---|:---:|:---:|
@@ -68,7 +73,7 @@ All three cuDensityMat wrappers call the same C library. The wrapper overhead:
 | Python CuPy | 159.4 ms | 7% slower |
 | JAX extension | 160.5 ms | 8% slower |
 
-Julia's advantage comes from lower per-call dispatch overhead (no Python GIL, direct `ccall`). At M=6 the difference is modest because the cuDensityMat kernel dominates. At small sizes (M=2), the difference is more pronounced: Julia 0.478 ms vs Python 0.743 ms (55% faster).
+Julia's advantage comes from lower per-call dispatch overhead (no Python GIL, direct `ccall`). At M=6 the difference is modest because the cuDensityMat kernel dominates. At small sizes (M=2), the gap is larger: Julia 0.478 ms vs Python 0.743 ms (55% faster).
 
 ## Why cuDensityMat Scales Better
 
@@ -82,7 +87,13 @@ CPU and GPU implementations produce **bitwise-identical results** for the static
 
 ## Environment Details
 
-### Cross-framework benchmarks (T4)
+### A100 benchmarks
+- **GPU**: NVIDIA A100-SXM4-40GB (2 TB/s bandwidth, 9.7 TFLOPS FP64)
+- **CPU**: 12 vCPUs (GCE a2-highgpu-1g, 85 GB RAM)
+- **Julia**: 1.12.5, CUDA.jl, cuQuantum\_jll
+- **CUDA**: 12.8, Driver 570.211.01
+
+### T4 cross-framework benchmarks
 - **GPU**: NVIDIA Tesla T4 (16 GB, 300 GB/s bandwidth, 0.25 TFLOPS FP64)
 - **CPU**: 8 vCPUs (GCE n1-standard-8, 30 GB RAM)
 - **Julia**: 1.12.5
@@ -92,10 +103,6 @@ CPU and GPU implementations produce **bitwise-identical results** for the static
 - **cuquantum-python**: 25.3.0 (CuPy), 25.11.1 (JAX ext)
 - **cuquantum-python-jax**: 0.0.3 (experimental, built from source)
 - **CUDA**: 12.8, Driver 570.211.01
-
-### A100 benchmarks
-- **GPU**: NVIDIA A100-SXM4-40GB (2 TB/s bandwidth, 9.7 TFLOPS FP64)
-- **CPU**: 12 vCPUs (GCE a2-highgpu-1g, 85 GB RAM)
 
 ### Reproduction
 
