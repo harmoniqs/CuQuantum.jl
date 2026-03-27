@@ -9,10 +9,13 @@ deps/build.log
 gen/output/
 trajectory.csv
 benchmark_results*.csv
+benchmark/comparison/results_*.csv
+benchmark/comparison/Manifest.toml
 
-# Editor/OS
+# Editor/OS/Tool caches
 .vscode/
 .idea/
+.ruff_cache/
 *.swp
 *~
 .DS_Store
