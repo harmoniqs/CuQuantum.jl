@@ -45,7 +45,7 @@ The `mode_action_duality` array controls how each index of the elementary operat
 
 For Lindblad sandwich terms ``a \rho a^\dagger``, use a **fused** 2-mode elementary operator with `mode_action_duality = [0, 1]` and `modes_acted_on = [m, m]` (same physical mode for both).
 
-### Operators
+### Composite Operators
 
 An `Operator` is a sum of `OperatorTerm`s, each appended with a duality flag and coefficient:
 
