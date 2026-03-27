@@ -41,6 +41,21 @@ At ``M=6``, cuSPARSE is 8× faster than cuDensityMat. At ``M=8``, the Liouvillia
 | 6 | 729 | 6.45 ms | **0.90 ms** |
 | 8 | 6,561 | 620 ms | infeasible |
 
+## Batched Evolution (A100)
+
+Many density matrices evolved with different coupling strengths in one kernel launch — the parameter sweep use case for quantum optimal control.
+
+| M | D | Batch | cuDM batched | cuDM sequential | Speedup |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| 2 | 9 | 64 | **0.45 ms** | 20.6 ms | 46× |
+| 2 | 9 | 256 | **0.38 ms** | 70.1 ms | 186× |
+| 4 | 81 | 64 | **2.79 ms** | 70.1 ms | 25× |
+| 4 | 81 | 256 | **8.05 ms** | 280.7 ms | 35× |
+| 6 | 729 | 64 | **297 ms** | 497 ms | 1.7× |
+| 6 | 729 | 256 | **1,146 ms** | 1,990 ms | 1.7× |
+
+At small system sizes (``M=2\text{--}4``), native batching amortizes kernel launch overhead by up to 186×. At ``M=6``, the per-action cost dominates and batching gives ~1.7× speedup.
+
 ## Cross-Framework Comparison (Tesla T4)
 
 Five frameworks, same problem. cuDensityMat benchmarks use RK4; QuantumToolbox.jl and QuTiP use adaptive solvers.
@@ -93,4 +108,4 @@ CPU and GPU produce **bitwise-identical** results for the static Liouvillian at 
 
 ## Reproduction
 
-Benchmark scripts are in [`benchmark/comparison/`](https://github.com/harmoniqs/CuQuantum.jl/tree/main/benchmark/comparison). See the [README](https://github.com/harmoniqs/CuQuantum.jl/blob/main/benchmark/comparison/README.md) for setup and run instructions.
+Benchmark scripts are in [`benchmark/comparison/`](https://github.com/harmoniqs/CuQuantum.jl/tree/main/benchmark/comparison) and [`benchmark/batched/`](https://github.com/harmoniqs/CuQuantum.jl/tree/main/benchmark/batched). See the [comparison README](https://github.com/harmoniqs/CuQuantum.jl/blob/main/benchmark/comparison/README.md) for setup and run instructions.
