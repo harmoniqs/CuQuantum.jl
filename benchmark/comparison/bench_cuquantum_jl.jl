@@ -51,7 +51,9 @@ function build_system(M::Int, d::Int)
         aa_dag_fused[i0, i1, j0, j1] = a_matrix[i0, j0] * a_dag[i1, j1]
     end
     elem_aa_dag = CuDensityMat.create_elementary_operator(
-        ws, [d, d], CUDA.CuVector{T}(vec(aa_dag_fused))
+        ws,
+        [d, d],
+        CUDA.CuVector{T}(vec(aa_dag_fused)),
     )
 
     # Coupling operators
@@ -75,7 +77,10 @@ function build_system(M::Int, d::Int)
     kerr_term = CuDensityMat.create_operator_term(ws, dims)
     for m = 0:(M-1)
         CuDensityMat.append_elementary_product!(
-            kerr_term, [elem_kerr], Int32[m], Int32[0];
+            kerr_term,
+            [elem_kerr],
+            Int32[m],
+            Int32[0];
             coefficient = ComplexF64(chi),
         )
     end
@@ -85,7 +90,10 @@ function build_system(M::Int, d::Int)
     for n = 0:(M-1), m = 0:(M-1)
         n == m && continue
         CuDensityMat.append_elementary_product!(
-            coupling_term, [coupling_elems[(n, m)]], Int32[n, m], Int32[0, 0];
+            coupling_term,
+            [coupling_elems[(n, m)]],
+            Int32[n, m],
+            Int32[0, 0];
             coefficient = ComplexF64(kappa0),
         )
     end
@@ -94,7 +102,10 @@ function build_system(M::Int, d::Int)
     diss_sandwich = CuDensityMat.create_operator_term(ws, dims)
     for m = 0:(M-1)
         CuDensityMat.append_elementary_product!(
-            diss_sandwich, [elem_aa_dag], Int32[m, m], Int32[0, 1];
+            diss_sandwich,
+            [elem_aa_dag],
+            Int32[m, m],
+            Int32[0, 1];
             coefficient = ComplexF64(1.0),
         )
     end
@@ -103,7 +114,10 @@ function build_system(M::Int, d::Int)
     diss_number = CuDensityMat.create_operator_term(ws, dims)
     for m = 0:(M-1)
         CuDensityMat.append_elementary_product!(
-            diss_number, [elem_n], Int32[m], Int32[0];
+            diss_number,
+            [elem_n],
+            Int32[m],
+            Int32[0];
             coefficient = ComplexF64(1.0),
         )
     end
@@ -112,20 +126,35 @@ function build_system(M::Int, d::Int)
     liouvillian = CuDensityMat.create_operator(ws, dims)
     for term in [kerr_term, coupling_term]
         CuDensityMat.append_term!(
-            liouvillian, term; duality = 0, coefficient = ComplexF64(0, -1),
+            liouvillian,
+            term;
+            duality = 0,
+            coefficient = ComplexF64(0, -1),
         )
         CuDensityMat.append_term!(
-            liouvillian, term; duality = 1, coefficient = ComplexF64(0, +1),
+            liouvillian,
+            term;
+            duality = 1,
+            coefficient = ComplexF64(0, +1),
         )
     end
     CuDensityMat.append_term!(
-        liouvillian, diss_sandwich; duality = 0, coefficient = ComplexF64(gamma),
+        liouvillian,
+        diss_sandwich;
+        duality = 0,
+        coefficient = ComplexF64(gamma),
     )
     CuDensityMat.append_term!(
-        liouvillian, diss_number; duality = 0, coefficient = ComplexF64(-gamma / 2),
+        liouvillian,
+        diss_number;
+        duality = 0,
+        coefficient = ComplexF64(-gamma / 2),
     )
     CuDensityMat.append_term!(
-        liouvillian, diss_number; duality = 1, coefficient = ComplexF64(-gamma / 2),
+        liouvillian,
+        diss_number;
+        duality = 1,
+        coefficient = ComplexF64(-gamma / 2),
     )
 
     # States
@@ -158,7 +187,8 @@ end
 # =============================================================================
 
 function bench_single_action(
-    M::Int, d::Int;
+    M::Int,
+    d::Int;
     n_warmup = M >= 9 ? 1 : 3,
     n_trials = M >= 9 ? 5 : (M >= 8 ? 10 : 50),
 )
@@ -167,7 +197,12 @@ function bench_single_action(
     for _ = 1:n_warmup
         CuDensityMat.initialize_zero!(rho_dot)
         CuDensityMat.compute_operator_action!(
-            ws, liouvillian, rho, rho_dot; time = 0.1, batch_size = 1,
+            ws,
+            liouvillian,
+            rho,
+            rho_dot;
+            time = 0.1,
+            batch_size = 1,
         )
     end
 
@@ -177,7 +212,12 @@ function bench_single_action(
         CUDA.synchronize()
         t0 = time_ns()
         CuDensityMat.compute_operator_action!(
-            ws, liouvillian, rho, rho_dot; time = 0.1, batch_size = 1,
+            ws,
+            liouvillian,
+            rho,
+            rho_dot;
+            time = 0.1,
+            batch_size = 1,
         )
         CUDA.synchronize()
         t1 = time_ns()
@@ -199,7 +239,12 @@ function bench_rk4_simulation(M::Int, d::Int; n_steps::Int = 100, dt::Float64 = 
     function eval_L!(k_out, rho_in, t)
         CuDensityMat.initialize_zero!(k_out)
         CuDensityMat.compute_operator_action!(
-            ws, liouvillian, rho_in, k_out; time = t, batch_size = 1,
+            ws,
+            liouvillian,
+            rho_in,
+            k_out;
+            time = t,
+            batch_size = 1,
         )
     end
 
@@ -275,7 +320,10 @@ function main()
             else
                 @printf(
                     "Skipping M=%d (D=%d): need ~%.1f GB, free=%.1f GB\n",
-                    M_try, D_try, needed / 1e9, free / 1e9
+                    M_try,
+                    D_try,
+                    needed / 1e9,
+                    free / 1e9
                 )
             end
         end
