@@ -7,17 +7,17 @@ Julia bindings for the [NVIDIA cuQuantum SDK](https://docs.nvidia.com/cuda/cuqua
 
 ## Motivation
 
-Standard Lindblad solvers materialize the Liouvillian as a sparse `D² × D²` matrix and compute `L[ρ]` via sparse matrix-vector multiply. For `M` coupled cavities with Fock truncation `d`, the Hilbert space dimension is `D = dᴹ`. At M=8, D=6,561 and the Liouvillian has 43 million rows — requiring >77 GB just for the sparse matrix.
+Standard Lindblad solvers materialize the Liouvillian as a sparse $D^2 \times D^2$ matrix and compute $\mathcal{L}[\rho]$ via sparse matrix-vector multiply. For $M$ coupled cavities with Fock truncation $d$, the Hilbert space dimension is $D = d^M$. At $M=8$, $D=6{,}561$ and the Liouvillian has 43 million rows — requiring >77 GB just for the sparse matrix.
 
-CuQuantum.jl wraps NVIDIA's [cuDensityMat](https://docs.nvidia.com/cuda/cuquantum/latest/cudensitymat/index.html) library, which decomposes `L[ρ]` into tensor network contractions over small per-mode operators. It never forms the full superoperator, enabling simulation of systems where sparse approaches are infeasible.
+CuQuantum.jl wraps NVIDIA's [cuDensityMat](https://docs.nvidia.com/cuda/cuquantum/latest/cudensitymat/index.html) library, which decomposes $\mathcal{L}[\rho]$ into tensor network contractions over small per-mode operators. It never forms the full superoperator, enabling simulation of systems where sparse approaches are infeasible.
 
 ### When to use cuDensityMat
 
 | Regime | Hilbert dim | Best approach |
 |:---|:---:|:---|
-| M ≤ 4 | ≤ 81 | CPU sparse ([QuantumToolbox.jl](https://github.com/qutip/QuantumToolbox.jl)) |
-| M = 5–6 | ≤ 729 | GPU cuSPARSE SpMV (fastest per-action) |
-| **M ≥ 8** | **≥ 6,561** | **cuDensityMat (only option)** |
+| $M \le 4$ | $\le 81$ | CPU sparse ([QuantumToolbox.jl](https://github.com/qutip/QuantumToolbox.jl)) |
+| $M = 5\text{--}6$ | $\le 729$ | GPU cuSPARSE SpMV (fastest per-action) |
+| $M \ge 8$ | $\ge 6{,}561$ | **cuDensityMat (only option)** |
 
 cuDensityMat also supports **native batching** — many density matrices evolved with different parameters in a single kernel launch — and **backward differentiation** for parameter gradients, both essential for quantum optimal control.
 
@@ -27,7 +27,7 @@ cuDensityMat also supports **native batching** — many density matrices evolved
 - **Time-dependent callbacks** — CPU scalar and tensor callbacks for driven systems
 - **Backward differentiation** — parameter gradients via VJP (single-GPU)
 - **Native batching** — parallel evolution of many states with different parameters
-- **Expectation values** — `Tr(Oρ)` for arbitrary operators
+- **Expectation values** — $\text{Tr}(O\rho)$ for arbitrary operators
 - **MPI/NCCL distributed** — multi-GPU forward-pass computation
 - **Tensor network contraction** — never materializes the full superoperator
 
@@ -42,9 +42,9 @@ Requires a CUDA-capable GPU (Turing or newer) and Julia 1.10+.
 
 ## Benchmarks
 
-All benchmarks use M coupled cavities with Fock truncation d=3, Kerr nonlinearity + all-to-all coupling + photon loss. See [Methodology](#methodology) for the full problem specification.
+All benchmarks use $M$ coupled cavities with Fock truncation $d=3$, Kerr nonlinearity + all-to-all coupling + photon loss. See [Methodology](#methodology) for the full problem specification.
 
-### Single `L[ρ]` Action — A100
+### Single $\mathcal{L}[\rho]$ Action — A100
 
 Time for one evaluation of the Liouvillian action (median, after warmup).
 
@@ -77,7 +77,7 @@ Many density matrices evolved with different coupling strengths in one kernel la
 | 6 | 729 | 64 | **297 ms** | 497 ms | 1.7× |
 | 6 | 729 | 256 | **1,146 ms** | 1,990 ms | 1.7× |
 
-At small system sizes (M=2–4), native batching amortizes kernel launch overhead by up to 186×. At M=6, the per-action cost dominates and batching gives ~1.7× speedup.
+At small system sizes ($M=2\text{--}4$), native batching amortizes kernel launch overhead by up to 186×. At $M=6$, the per-action cost dominates and batching gives ~1.7× speedup.
 
 ### Cross-Framework Comparison — Tesla T4
 
@@ -91,7 +91,7 @@ Julia wrapper is 7–8% faster than the Python (CuPy) and JAX wrappers over the 
 
 ### Wrapper Overhead
 
-| Wrapper | Single L[ρ] at M=6 (T4) |
+| Wrapper | Single $\mathcal{L}[\rho]$ at $M=6$ (T4) |
 |:---|:---:|
 | **CuQuantum.jl** (Julia) | 149 ms |
 | Python CuPy | 159 ms (+7%) |
@@ -101,17 +101,16 @@ Julia wrapper is 7–8% faster than the Python (CuPy) and JAX wrappers over the 
 
 All benchmarks use the same physical system:
 
-```
-H = Σ_m χ n_m(n_m-1) + Σ_{n≠m} κ a_n†a_m
-L[ρ] = -i[H,ρ] + γ Σ_m (a_m ρ a_m† - ½{n_m, ρ})
-```
+$$H = \sum_m \chi\, n_m(n_m - 1) + \sum_{n \ne m} \kappa\, a_n^\dagger a_m$$
 
-- **Fock truncation**: d = 3 per cavity
-- **Parameters**: χ = 2π × 0.2, κ = 2π × 0.1, γ = 0.01
-- **Initial state**: |1,0,...,0⟩⟨1,0,...,0|
-- **Integration**: 100-step RK4 with dt = 0.01 (cuDensityMat, cuSPARSE) or DP5 adaptive with atol=10⁻⁸, rtol=10⁻⁶ (QuantumToolbox.jl, QuTiP)
+$$\mathcal{L}[\rho] = -i[H, \rho] + \gamma \sum_m \left( a_m \rho a_m^\dagger - \tfrac{1}{2}\{n_m, \rho\} \right)$$
+
+- **Fock truncation**: $d = 3$ per cavity
+- **Parameters**: $\chi = 2\pi \times 0.2$, $\kappa = 2\pi \times 0.1$, $\gamma = 0.01$
+- **Initial state**: $|1,0,\ldots,0\rangle\langle 1,0,\ldots,0|$
+- **Integration**: 100-step RK4 with $dt = 0.01$ (cuDensityMat, cuSPARSE) or DP5 adaptive with $\text{atol}=10^{-8}$, $\text{rtol}=10^{-6}$ (QuantumToolbox.jl, QuTiP)
 - **Timing**: wall-clock, excludes JIT/compilation warmup
-- **Validation**: CPU and GPU produce bitwise-identical results for static Liouvillian at t=0
+- **Validation**: CPU and GPU produce bitwise-identical results for static Liouvillian at $t=0$
 
 ### Hardware
 
