@@ -27,10 +27,10 @@ term = CuDensityMat.create_operator_term(ws, dims)
 CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
 
 operator = CuDensityMat.create_operator(ws, dims)
-CuDensityMat.append_term!(operator, term; duality=0)
+CuDensityMat.append_term!(operator, term; duality = 0)
 
 # --- Create state ρ = |0⟩⟨0| ---
-ρ = DenseMixedState{ComplexF64}(ws, (2,); batch_size=1)
+ρ = DenseMixedState{ComplexF64}(ws, (2,); batch_size = 1)
 CuDensityMat.allocate_storage!(ρ)
 # |0⟩⟨0| = [[1,0],[0,0]] stored column-major
 copyto!(ρ.storage, CUDA.CuVector{ComplexF64}([1.0, 0.0, 0.0, 0.0]))
@@ -40,7 +40,7 @@ exp = CuDensityMat.create_expectation(ws, operator)
 CuDensityMat.prepare_expectation!(ws, exp, ρ)
 
 result = CUDA.zeros(ComplexF64, 1)
-CuDensityMat.compute_expectation!(ws, exp, ρ, result; time=0.0, batch_size=1)
+CuDensityMat.compute_expectation!(ws, exp, ρ, result; time = 0.0, batch_size = 1)
 
 val = Array(result)[1]
 println("Tr(σ_z |0⟩⟨0|) = $(real(val))")  # should print 1.0

@@ -42,7 +42,7 @@ n_mat = CUDA.CuVector{ComplexF64}([0.0+0im, 0.0, 0.0, 1.0+0im])
 a_matrix = [0.0 1.0; 0.0 0.0]
 a_dag = transpose(a_matrix)
 aa_dag = zeros(ComplexF64, d, d, d, d)
-for j1 in 1:d, j0 in 1:d, i1 in 1:d, i0 in 1:d
+for j1 = 1:d, j0 = 1:d, i1 = 1:d, i0 = 1:d
     aa_dag[i0, i1, j0, j1] = a_matrix[i0, j0] * a_dag[i1, j1]
 end
 aa_dag_gpu = CUDA.CuVector{ComplexF64}(vec(aa_dag))
@@ -55,44 +55,78 @@ elem_aa_dag = CuDensityMat.create_elementary_operator(ws, [d, d], aa_dag_gpu)
 # --- Build Hamiltonian: H = (ω/2) σ_z ---
 hamiltonian_term = CuDensityMat.create_operator_term(ws, dims)
 CuDensityMat.append_elementary_product!(
-    hamiltonian_term, [elem_σz], Int32[0], Int32[0];
-    coefficient=ComplexF64(ω / 2),
+    hamiltonian_term,
+    [elem_σz],
+    Int32[0],
+    Int32[0];
+    coefficient = ComplexF64(ω / 2),
 )
 
 # --- Build Lindblad dissipator ---
 # Sandwich: γ (a ρ a†)
 sandwich_term = CuDensityMat.create_operator_term(ws, dims)
 CuDensityMat.append_elementary_product!(
-    sandwich_term, [elem_aa_dag], Int32[0, 0], Int32[0, 1];
-    coefficient=ComplexF64(1.0),
+    sandwich_term,
+    [elem_aa_dag],
+    Int32[0, 0],
+    Int32[0, 1];
+    coefficient = ComplexF64(1.0),
 )
 
 # Anticommutator: -½ γ {a†a, ρ} = -½ γ (n ρ + ρ n)
 number_term = CuDensityMat.create_operator_term(ws, dims)
 CuDensityMat.append_elementary_product!(
-    number_term, [elem_n], Int32[0], Int32[0];
-    coefficient=ComplexF64(1.0),
+    number_term,
+    [elem_n],
+    Int32[0],
+    Int32[0];
+    coefficient = ComplexF64(1.0),
 )
 
 # --- Assemble Liouvillian L[ρ] = -i[H,ρ] + D[ρ] ---
 liouvillian = CuDensityMat.create_operator(ws, dims)
 
 # -i[H, ρ] = (-i)(Hρ) + (i)(ρH)
-CuDensityMat.append_term!(liouvillian, hamiltonian_term; duality=0, coefficient=ComplexF64(0, -1))
-CuDensityMat.append_term!(liouvillian, hamiltonian_term; duality=1, coefficient=ComplexF64(0, +1))
+CuDensityMat.append_term!(
+    liouvillian,
+    hamiltonian_term;
+    duality = 0,
+    coefficient = ComplexF64(0, -1),
+)
+CuDensityMat.append_term!(
+    liouvillian,
+    hamiltonian_term;
+    duality = 1,
+    coefficient = ComplexF64(0, +1),
+)
 
 # D[ρ] = γ(a ρ a†) - (γ/2)(nρ) - (γ/2)(ρn)
-CuDensityMat.append_term!(liouvillian, sandwich_term; duality=0, coefficient=ComplexF64(γ))
-CuDensityMat.append_term!(liouvillian, number_term; duality=0, coefficient=ComplexF64(-γ / 2))
-CuDensityMat.append_term!(liouvillian, number_term; duality=1, coefficient=ComplexF64(-γ / 2))
+CuDensityMat.append_term!(
+    liouvillian,
+    sandwich_term;
+    duality = 0,
+    coefficient = ComplexF64(γ),
+)
+CuDensityMat.append_term!(
+    liouvillian,
+    number_term;
+    duality = 0,
+    coefficient = ComplexF64(-γ / 2),
+)
+CuDensityMat.append_term!(
+    liouvillian,
+    number_term;
+    duality = 1,
+    coefficient = ComplexF64(-γ / 2),
+)
 
 # --- Initial state: ρ = |1⟩⟨1| ---
-ρ = DenseMixedState{ComplexF64}(ws, (d,); batch_size=1)
+ρ = DenseMixedState{ComplexF64}(ws, (d,); batch_size = 1)
 CuDensityMat.allocate_storage!(ρ)
 copyto!(ρ.storage, CUDA.CuVector{ComplexF64}([0.0, 0.0, 0.0, 1.0]))
 
 # Scratch state for L[ρ]
-ρ_dot = DenseMixedState{ComplexF64}(ws, (d,); batch_size=1)
+ρ_dot = DenseMixedState{ComplexF64}(ws, (d,); batch_size = 1)
 CuDensityMat.allocate_storage!(ρ_dot)
 
 # --- Prepare the action (one-time) ---
@@ -102,12 +136,19 @@ CuDensityMat.prepare_operator_action!(ws, liouvillian, ρ, ρ_dot)
 println("  t (μs)    P(|1⟩)    P(|1⟩) exact    error")
 println("  " * "-"^50)
 
-for step in 1:n_steps
+for step = 1:n_steps
     t = (step - 1) * dt
 
     # Compute ρ̇ = L[ρ]
     CuDensityMat.initialize_zero!(ρ_dot)
-    CuDensityMat.compute_operator_action!(ws, liouvillian, ρ, ρ_dot; time=t, batch_size=1)
+    CuDensityMat.compute_operator_action!(
+        ws,
+        liouvillian,
+        ρ,
+        ρ_dot;
+        time = t,
+        batch_size = 1,
+    )
 
     # Euler step: ρ += dt * ρ̇
     CuDensityMat.inplace_accumulate!(ρ, ρ_dot, ComplexF64(dt))
