@@ -27,8 +27,8 @@ For example, ``M=4`` cavities each truncated to ``d=3`` Fock states gives dimens
 
 Density matrices ``\rho`` are stored as dense tensors on the GPU. CuQuantum.jl provides two state types:
 
-- **[`DensePureState`](@ref)**: ``|\psi\rangle`` with shape ``(d_1, d_2, \ldots, d_M)``
-- **[`DenseMixedState`](@ref)**: ``\rho`` with shape ``(d_1, \ldots, d_M, d_1, \ldots, d_M)`` — first ``M`` indices are ket, last ``M`` are bra
+- **`DensePureState`**: ``|\psi\rangle`` with shape ``(d_1, d_2, \ldots, d_M)``
+- **`DenseMixedState`**: ``\rho`` with shape ``(d_1, \ldots, d_M, d_1, \ldots, d_M)`` — first ``M`` indices are ket, last ``M`` are bra
 
 See [States](@ref "Quantum States") for operations on states.
 

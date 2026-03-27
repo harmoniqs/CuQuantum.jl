@@ -27,9 +27,14 @@ const OUTPUT_DIR = joinpath(@__DIR__, "output")
 mkpath(OUTPUT_DIR)
 
 # Generator options
-options = load_options(joinpath(@__DIR__, "generator.toml"))
+const GENERATOR_TOML = joinpath(@__DIR__, "generator.toml")
+options = if isfile(GENERATOR_TOML)
+    load_options(GENERATOR_TOML)
+else
+    @warn "generator.toml not found, using defaults"
+    Dict{String,Any}()
+end
 
-# If generator.toml doesn't exist, use defaults
 args = get_default_args()
 push!(args, "-I$CUQUANTUM_INCLUDE")
 
