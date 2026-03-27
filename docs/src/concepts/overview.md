@@ -11,7 +11,7 @@ Elementary Operators  →  Operator Terms  →  Operators  →  Operator Action
     (single-mode)       (tensor products)   (sums of terms)   (L[ρ] computation)
 ```
 
-See [Operators](@ref) for details on each level of the hierarchy.
+See [Operators](@ref "Operators") for details on each level of the hierarchy.
 
 ## Hilbert Space
 
@@ -27,8 +27,8 @@ For example, ``M=4`` cavities each truncated to ``d=3`` Fock states gives dimens
 
 Density matrices ``\rho`` are stored as dense tensors on the GPU. CuQuantum.jl provides two state types:
 
-- **[`DensePureState`](@ref)**: ``|\psi\rangle`` with shape ``(d_1, d_2, \ldots, d_M)``
-- **[`DenseMixedState`](@ref)**: ``\rho`` with shape ``(d_1, \ldots, d_M, d_1, \ldots, d_M)`` — first ``M`` indices are ket, last ``M`` are bra
+- **`DensePureState`**: ``|\psi\rangle`` with shape ``(d_1, d_2, \ldots, d_M)``
+- **`DenseMixedState`**: ``\rho`` with shape ``(d_1, \ldots, d_M, d_1, \ldots, d_M)`` — first ``M`` indices are ket, last ``M`` are bra
 
 See [States](@ref "Quantum States") for operations on states.
 
@@ -50,7 +50,7 @@ This decomposes into operator terms with specific duality flags:
 | ``-\frac{\gamma}{2} L^\dagger L \rho`` | 0 (ket) | ``-\gamma/2`` |
 | ``-\frac{\gamma}{2} \rho L^\dagger L`` | 1 (bra) | ``-\gamma/2`` |
 
-The sandwich term ``L\rho L^\dagger`` uses a fused operator with `mode_action_duality = [0, 1]` — mode 0 on the ket side, mode 1 on the bra side. See [Operators](@ref) for how to construct this.
+The sandwich term ``L\rho L^\dagger`` uses a fused operator with `mode_action_duality = [0, 1]` — mode 0 on the ket side, mode 1 on the bra side. See [Operators](@ref "Operators") for how to construct this.
 
 ## WorkStream
 
