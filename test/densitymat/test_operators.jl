@@ -188,6 +188,52 @@
         close(ws)
     end
 
+    @testset "compute action (batch_size=$bs)" for bs in TEST_BATCH_SIZES
+        @gpu_test "sigma_z action batch_size=$bs" begin
+            ws = WorkStream()
+            dims = [2]
+            T = ComplexF64
+
+            # Build a simple operator: sigma_z = diag(1, -1)
+            sigma_z_data = CUDA.CuVector{T}([1.0 + 0im, 0.0, 0.0, -1.0 + 0im])
+            elem = CuDensityMat.create_elementary_operator(ws, [2], sigma_z_data)
+
+            term = CuDensityMat.create_operator_term(ws, dims)
+            CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
+
+            operator = CuDensityMat.create_operator(ws, dims)
+            CuDensityMat.append_term!(operator, term; duality = 0, coefficient = 1.0)
+
+            # Create batched input and output states
+            psi_in = DenseMixedState{T}(ws, (2,); batch_size = bs)
+            psi_out = DenseMixedState{T}(ws, (2,); batch_size = bs)
+            CuDensityMat.allocate_storage!(psi_in)
+            CuDensityMat.allocate_storage!(psi_out)
+
+            # Set each batch entry to identity/2: rho = [[0.5, 0], [0, 0.5]]
+            rho_single = T[0.5, 0.0, 0.0, 0.5]
+            copyto!(psi_in.storage, CUDA.CuVector{T}(repeat(rho_single, bs)))
+
+            # Prepare and compute action
+            CuDensityMat.prepare_operator_action!(ws, operator, psi_in, psi_out)
+            CuDensityMat.initialize_zero!(psi_out)
+            CuDensityMat.compute_operator_action!(
+                ws,
+                operator,
+                psi_in,
+                psi_out;
+                time = 0.0,
+                batch_size = bs,
+            )
+
+            # Verify output is non-zero (sigma_z * rho should be non-trivial)
+            result = sync_and_pull(psi_out.storage)
+            @test any(x -> abs(x) > 0, result)
+
+            close(ws)
+        end
+    end
+
     @gpu_test "multi-operator action pipeline" begin
         ws = WorkStream()
         dims = [2]

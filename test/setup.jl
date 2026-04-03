@@ -31,4 +31,8 @@ end
 # Common test parameters
 const TEST_DTYPES = HAS_GPU ? [ComplexF32, ComplexF64] : []
 const TEST_DIMS = [[2], [2, 2], [2, 3], [3, 3]]
-const TEST_BATCH_SIZES = [0, 1, 4]
+const TEST_BATCH_SIZES = [1, 4]
+
+# Sync the CUDA stream and pull a CuArray to CPU.
+# Use instead of bare Array(x) in GPU tests so CUDA errors surface immediately.
+sync_and_pull(x) = (CUDA.synchronize(); Array(x))

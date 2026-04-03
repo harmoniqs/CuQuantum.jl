@@ -189,6 +189,19 @@ end
         close(ws)
     end
 
+    @testset "norm (dtype=$T)" for T in TEST_DTYPES
+        @gpu_test "pure state norm dtype=$T" begin
+            ws = WorkStream()
+            psi = make_state(ws, T, (2,), 1; mixed = false, init = :random)
+            n = sync_and_pull(CuDensityMat.norm(psi))
+            @test length(n) == 1
+            arr = sync_and_pull(psi.storage)
+            expected = real(dot(arr, arr))
+            @test n[1] ≈ expected rtol = real(T)(1.0e-4)
+            close(ws)
+        end
+    end
+
     @gpu_test "norm batched" begin
         ws = WorkStream()
         psi = make_state(ws, ComplexF64, (2, 2), 2; init = :random)
