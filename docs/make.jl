@@ -5,7 +5,6 @@ makedocs(;
     sitename = "CuQuantum.jl",
     modules = [CuQuantum, CuQuantum.CuDensityMat],
     authors = "Harmoniqs",
-    warnonly = [:missing_docs],
     format = Documenter.HTML(;
         canonical = "https://harmoniqs.github.io/CuQuantum.jl",
         edit_link = "main",

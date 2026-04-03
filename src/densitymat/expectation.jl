@@ -4,6 +4,7 @@
 # of operators with respect to quantum states: Tr(O * ρ).
 
 export Expectation, create_expectation, destroy_expectation
+export prepare_expectation!, compute_expectation!
 
 """
     Expectation
@@ -40,6 +41,11 @@ end
 Base.close(x::Expectation) = _destroy!(x)
 Base.isopen(e::Expectation) = e.handle != C_NULL
 
+"""
+    destroy_expectation(e::Expectation)
+
+Explicitly destroy the handle. Prefer `close(e)` instead.
+"""
 function destroy_expectation(e::Expectation)
     return if e.handle != C_NULL
         cudensitymatDestroyExpectation(e.handle)

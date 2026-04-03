@@ -4,6 +4,7 @@
 # eigenstates of operators using a block Krylov algorithm.
 
 export OperatorSpectrum, create_operator_spectrum, destroy_operator_spectrum
+export configure_spectrum!, prepare_spectrum!, compute_spectrum!
 
 """
     OperatorSpectrum
@@ -40,6 +41,11 @@ end
 Base.close(x::OperatorSpectrum) = _destroy!(x)
 Base.isopen(s::OperatorSpectrum) = s.handle != C_NULL
 
+"""
+    destroy_operator_spectrum(s::OperatorSpectrum)
+
+Explicitly destroy the handle. Prefer `close(s)` instead.
+"""
 function destroy_operator_spectrum(s::OperatorSpectrum)
     return if s.handle != C_NULL
         cudensitymatDestroyOperatorSpectrum(s.handle)

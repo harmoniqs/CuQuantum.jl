@@ -4,11 +4,16 @@
 # Operators are composed from elementary single-mode operators via tensor products,
 # then assembled into terms and composite operators for action computation.
 
-export ElementaryOperator, create_elementary_operator, destroy_elementary_operator
-export MatrixOperator, create_matrix_operator, destroy_matrix_operator
+export ElementaryOperator, create_elementary_operator, create_elementary_operator_batch, destroy_elementary_operator
+export MatrixOperator, create_matrix_operator, create_matrix_operator_batch, destroy_matrix_operator
 export OperatorTerm, create_operator_term, destroy_operator_term
+export append_elementary_product!, append_elementary_product_batch!, append_matrix_product!
 export Operator, create_operator, destroy_operator
+export append_term!, append_term_batch!
 export OperatorAction, create_operator_action, destroy_operator_action
+export prepare_action!, compute_action!
+export prepare_operator_action!, compute_operator_action!
+export prepare_operator_action_backward!, compute_operator_action_backward!
 
 # =============================================================================
 # No-callback sentinel (null callback structs)
@@ -195,6 +200,11 @@ function create_elementary_operator_batch(
     return ElementaryOperator(op_ref[], ws; data_ref = data)
 end
 
+"""
+    destroy_elementary_operator(op::ElementaryOperator)
+
+Explicitly destroy the handle. Prefer `close(op)` instead.
+"""
 function destroy_elementary_operator(op::ElementaryOperator)
     return if op.handle != C_NULL
         cudensitymatDestroyElementaryOperator(op.handle)
@@ -307,6 +317,11 @@ function create_matrix_operator_batch(
     return MatrixOperator(op_ref[], ws; data_ref = data)
 end
 
+"""
+    destroy_matrix_operator(op::MatrixOperator)
+
+Explicitly destroy the handle. Prefer `close(op)` instead.
+"""
 function destroy_matrix_operator(op::MatrixOperator)
     return if op.handle != C_NULL
         cudensitymatDestroyMatrixOperator(op.handle)
@@ -497,6 +512,11 @@ function append_matrix_product!(
     return nothing
 end
 
+"""
+    destroy_operator_term(term::OperatorTerm)
+
+Explicitly destroy the handle. Prefer `close(term)` instead.
+"""
 function destroy_operator_term(term::OperatorTerm)
     return if term.handle != C_NULL
         cudensitymatDestroyOperatorTerm(term.handle)
@@ -626,6 +646,11 @@ function append_term_batch!(
     return nothing
 end
 
+"""
+    destroy_operator(op::Operator)
+
+Explicitly destroy the handle. Prefer `close(op)` instead.
+"""
 function destroy_operator(op::Operator)
     return if op.handle != C_NULL
         cudensitymatDestroyOperator(op.handle)
@@ -672,6 +697,11 @@ end
 Base.close(x::OperatorAction) = _destroy!(x)
 Base.isopen(a::OperatorAction) = a.handle != C_NULL
 
+"""
+    destroy_operator_action(action::OperatorAction)
+
+Explicitly destroy the handle. Prefer `close(action)` instead.
+"""
 function destroy_operator_action(action::OperatorAction)
     return if action.handle != C_NULL
         cudensitymatDestroyOperatorAction(action.handle)

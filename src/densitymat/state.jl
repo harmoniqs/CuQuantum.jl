@@ -4,6 +4,9 @@
 # Mirrors Python's DensePureState/DenseMixedState classes.
 
 export DensePureState, DenseMixedState
+export allocate_storage!, attach_storage!, state_view
+export initialize_zero!, inplace_scale!, inplace_accumulate!, clone
+export num_components, component_storage_size, storage_size, local_info
 
 # --- Julia type → cudaDataType mapping ---
 

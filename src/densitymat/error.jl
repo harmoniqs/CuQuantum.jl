@@ -2,6 +2,12 @@
 
 export CUDENSITYMATError
 
+"""
+    CUDENSITYMATError(code)
+
+Exception thrown when a cuDensityMat API call returns a non-success status code.
+The `code` field holds the raw `cudensitymatStatus_t` value.
+"""
 struct CUDENSITYMATError <: Exception
     code::cudensitymatStatus_t
 end
