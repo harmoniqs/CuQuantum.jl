@@ -199,6 +199,5 @@ function compute_spectrum!(
         ws.workspace,
         CUDA.stream().handle,
     )
-    CUDA.synchronize()
     return tolerances
 end

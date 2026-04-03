@@ -363,7 +363,6 @@ function inplace_scale!(state::DenseState{T}, factors) where {T}
         pointer(factors_gpu),
         CUDA.stream().handle,
     )
-    CUDA.synchronize()
     return nothing
 end
 
@@ -382,7 +381,6 @@ function LinearAlgebra.norm(state::DenseState{T}) where {T}
         pointer(result),
         CUDA.stream().handle,
     )
-    CUDA.synchronize()
     return Array(result)
 end
 
@@ -400,7 +398,6 @@ function LinearAlgebra.tr(state::DenseState{T}) where {T}
         pointer(result),
         CUDA.stream().handle,
     )
-    CUDA.synchronize()
     return Array(result)
 end
 
@@ -423,7 +420,6 @@ function inplace_accumulate!(
         pointer(factors_gpu),
         CUDA.stream().handle,
     )
-    CUDA.synchronize()
     return nothing
 end
 
@@ -442,7 +438,6 @@ function LinearAlgebra.dot(left::DenseState{T}, right::DenseState{T}) where {T}
         pointer(result),
         CUDA.stream().handle,
     )
-    CUDA.synchronize()
     return Array(result)
 end
 

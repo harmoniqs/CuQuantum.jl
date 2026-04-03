@@ -790,7 +790,6 @@ function compute_action!(
         ws.workspace,
         CUDA.stream().handle,
     )
-    CUDA.synchronize()
     return nothing
 end
 
@@ -863,7 +862,6 @@ function compute_operator_action!(
         ws.workspace,
         CUDA.stream().handle,
     )
-    CUDA.synchronize()
     return nothing
 end
 
@@ -952,6 +950,5 @@ function compute_operator_action_backward!(
         ws.workspace,
         CUDA.stream().handle,
     )
-    CUDA.synchronize()
     return nothing
 end

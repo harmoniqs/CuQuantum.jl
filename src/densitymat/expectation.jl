@@ -130,6 +130,5 @@ function compute_expectation!(
         ws.workspace,
         CUDA.stream().handle,
     )
-    CUDA.synchronize()
     return nothing
 end

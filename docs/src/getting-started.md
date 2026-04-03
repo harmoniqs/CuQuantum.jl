@@ -50,3 +50,9 @@ Every CuQuantum.jl simulation follows this pattern:
 7. **Clean up** — `close(ws)`
 
 See the [Concepts](@ref "Concepts Overview") section for details on each step.
+
+!!! note "Synchronization"
+    CuDensityMat compute functions (`compute_operator_action!`, `compute_expectation!`,
+    etc.) are **asynchronous** — they enqueue work on the CUDA stream and return
+    immediately. To read results on CPU, call `CUDA.synchronize()` before accessing
+    GPU memory, or use `Array(result)` which synchronizes implicitly.
