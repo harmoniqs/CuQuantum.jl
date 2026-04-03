@@ -704,7 +704,7 @@ function compute_action!(
         states_in::AbstractVector{<:AbstractState},
         state_out::AbstractState;
         time::Real = 0.0,
-        batch_size::Integer = 0,
+        batch_size::Integer = 1,
         num_params::Integer = 0,
         params::Union{Nothing, CUDA.CuVector{Float64}} = nothing,
     )
@@ -778,7 +778,7 @@ function compute_operator_action!(
         state_in::AbstractState,
         state_out::AbstractState;
         time::Real = 0.0,
-        batch_size::Integer = 0,
+        batch_size::Integer = 1,
         num_params::Integer = 0,
         params::Union{Nothing, CUDA.CuVector{Float64}} = nothing,
     )
@@ -865,7 +865,7 @@ function compute_operator_action_backward!(
         state_in_adj::AbstractState,
         params_grad::CUDA.CuVector{Float64};
         time::Real = 0.0,
-        batch_size::Integer = 0,
+        batch_size::Integer = 1,
         num_params::Integer = 0,
         params::Union{Nothing, CUDA.CuVector{Float64}} = nothing,
     )

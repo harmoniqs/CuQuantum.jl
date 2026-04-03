@@ -46,10 +46,9 @@ mutable struct WorkStream
             device_id::Union{Nothing, Int} = nothing,
         )
         dev = if device_id !== nothing
-            CUDA.device!(device_id)
             device_id
         else
-            CUDA.device().handle
+            Int(CUDA.device())
         end
 
         s = stream !== nothing ? stream : CUDA.default_stream()
