@@ -1,6 +1,7 @@
 using Test
 
 include("setup.jl")
+include("aqua.jl")
 
 @testset "CuQuantum.jl" begin
 
