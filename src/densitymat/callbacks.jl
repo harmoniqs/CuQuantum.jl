@@ -13,7 +13,7 @@
 # GC safety: all registered callbacks are held in a global IdDict to prevent
 # garbage collection while the C library holds raw pointers.
 
-export wrap_scalar_callback, wrap_tensor_callback
+export wrap_scalar_callback, wrap_tensor_callback, unregister_callback!, CallbackRef
 
 # =============================================================================
 # Global callback registry (prevents GC of Julia functions)
@@ -45,6 +45,44 @@ function _get_callback(id::UInt)
         return _callback_registry[id]
     end
 end
+
+# =============================================================================
+# CallbackRef — handle with automatic cleanup via finalizer
+# =============================================================================
+
+"""
+    CallbackRef
+
+A handle to registered Julia callbacks in the cudensitymat callback registry.
+Automatically unregisters both the forward and gradient callbacks (if any) when
+finalized or when `close` is called explicitly.
+
+Prefer `close(ref)` for deterministic cleanup. The finalizer provides safety net cleanup.
+"""
+mutable struct CallbackRef
+    id::UInt
+    grad_id::UInt   # 0 if no gradient callback was registered
+
+    function CallbackRef(id::UInt, grad_id::UInt)
+        obj = new(id, grad_id)
+        finalizer(_destroy_callback_ref!, obj)
+        obj
+    end
+end
+
+function _destroy_callback_ref!(ref::CallbackRef)
+    if ref.id != 0
+        _unregister_callback(ref.id)
+        ref.id = 0
+    end
+    if ref.grad_id != 0
+        _unregister_callback(ref.grad_id)
+        ref.grad_id = 0
+    end
+end
+
+Base.close(ref::CallbackRef) = _destroy_callback_ref!(ref)
+Base.isopen(ref::CallbackRef) = ref.id != 0
 
 # =============================================================================
 # CUDA data type → Julia element type mapping
@@ -420,14 +458,8 @@ function wrap_scalar_callback(f::Function; gradient::Union{Nothing, Function} = 
         NULL_SCALAR_GRADIENT_CALLBACK
     end
 
-    # Return refs to prevent accidental unregistration
-    refs = (
-        id = id,
-        grad_id = (gradient !== nothing ? grad_id : nothing),
-        f = f,
-        gradient = gradient,
-    )
-    return cb, gcb, refs
+    ref = CallbackRef(id, gradient !== nothing ? grad_id : UInt(0))
+    return cb, gcb, ref
 end
 
 """
@@ -471,26 +503,17 @@ function wrap_tensor_callback(f::Function; gradient::Union{Nothing, Function} = 
         NULL_TENSOR_GRADIENT_CALLBACK
     end
 
-    refs = (
-        id = id,
-        grad_id = (gradient !== nothing ? grad_id : nothing),
-        f = f,
-        gradient = gradient,
-    )
-    return cb, gcb, refs
+    ref = CallbackRef(id, gradient !== nothing ? grad_id : UInt(0))
+    return cb, gcb, ref
 end
 
 """
-    unregister_callback!(refs)
+    unregister_callback!(ref::CallbackRef)
 
-Release a callback from the global registry, allowing GC.
-Call this after destroying the operator that uses the callback.
+Explicitly unregister a callback. Equivalent to `close(ref)`.
+The finalizer on `CallbackRef` does this automatically, so explicit
+calls are only needed for deterministic, eager cleanup.
 """
-function unregister_callback!(refs)
-    if refs.id !== nothing
-        _unregister_callback(refs.id)
-    end
-    return if refs.grad_id !== nothing
-        _unregister_callback(refs.grad_id)
-    end
+function unregister_callback!(ref::CallbackRef)
+    close(ref)
 end
