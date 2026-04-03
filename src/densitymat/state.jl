@@ -360,7 +360,7 @@ end
 
 Compute the trace(s). Returns a CPU vector of length `batch_size`.
 """
-function LinearAlgebra.tr(state::DenseMixedState{T}) where {T}
+function LinearAlgebra.tr(state::DenseState{T}) where {T}
     _check_state_valid(state)
     result = CUDA.zeros(T, state.batch_size)
     cudensitymatStateComputeTrace(

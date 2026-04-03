@@ -7,6 +7,7 @@ authors = ["Jack Champagne <jack@harmoniqs.co>"]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 CUDA_Runtime_Discovery = "1af6417a-86b4-443c-805f-a4643ffb695f"
 CEnum = "fa961155-64e5-5f13-b03f-caf6b980ea82"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 cuQuantum_jll = "b75408ef-6fdf-5d74-b65a-7df000ad18e6"
 
 [compat]
