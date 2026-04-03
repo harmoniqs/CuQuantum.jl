@@ -75,9 +75,7 @@ mutable struct WorkStream
         )
 
         # Register finalizer
-        finalizer(obj) do x
-            _destroy!(x)
-        end
+        finalizer(_destroy!, obj)
 
         return obj
     end
