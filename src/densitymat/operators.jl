@@ -79,16 +79,22 @@ mutable struct ElementaryOperator
             callback_refs = nothing,
         )
         obj = new(handle, ws, data_ref, callback_refs)
-        finalizer(obj) do x
-            if x.handle != C_NULL
-                cudensitymatDestroyElementaryOperator(x.handle)
-                x.handle = C_NULL
-            end
-        end
+        finalizer(_destroy!, obj)
         return obj
     end
 end
 
+function _destroy!(x::ElementaryOperator)
+    if x.handle != C_NULL
+        try
+            cudensitymatDestroyElementaryOperator(x.handle)
+        catch
+        end
+        x.handle = C_NULL
+    end
+end
+
+Base.close(x::ElementaryOperator) = _destroy!(x)
 Base.isopen(op::ElementaryOperator) = op.handle != C_NULL
 
 """
@@ -219,16 +225,22 @@ mutable struct MatrixOperator
             callback_refs = nothing,
         )
         obj = new(handle, ws, data_ref, callback_refs)
-        finalizer(obj) do x
-            if x.handle != C_NULL
-                cudensitymatDestroyMatrixOperator(x.handle)
-                x.handle = C_NULL
-            end
-        end
+        finalizer(_destroy!, obj)
         return obj
     end
 end
 
+function _destroy!(x::MatrixOperator)
+    if x.handle != C_NULL
+        try
+            cudensitymatDestroyMatrixOperator(x.handle)
+        catch
+        end
+        x.handle = C_NULL
+    end
+end
+
+Base.close(x::MatrixOperator) = _destroy!(x)
 Base.isopen(op::MatrixOperator) = op.handle != C_NULL
 
 """
@@ -327,16 +339,22 @@ mutable struct OperatorTerm
             dims::Vector{Int64},
         )
         obj = new(handle, ws, dims, Any[], Any[], Any[])
-        finalizer(obj) do x
-            if x.handle != C_NULL
-                cudensitymatDestroyOperatorTerm(x.handle)
-                x.handle = C_NULL
-            end
-        end
+        finalizer(_destroy!, obj)
         return obj
     end
 end
 
+function _destroy!(x::OperatorTerm)
+    if x.handle != C_NULL
+        try
+            cudensitymatDestroyOperatorTerm(x.handle)
+        catch
+        end
+        x.handle = C_NULL
+    end
+end
+
+Base.close(x::OperatorTerm) = _destroy!(x)
 Base.isopen(t::OperatorTerm) = t.handle != C_NULL
 
 """
@@ -504,16 +522,22 @@ mutable struct Operator
 
     function Operator(handle::cudensitymatOperator_t, ws::WorkStream, dims::Vector{Int64})
         obj = new(handle, ws, dims, Any[])
-        finalizer(obj) do x
-            if x.handle != C_NULL
-                cudensitymatDestroyOperator(x.handle)
-                x.handle = C_NULL
-            end
-        end
+        finalizer(_destroy!, obj)
         return obj
     end
 end
 
+function _destroy!(x::Operator)
+    if x.handle != C_NULL
+        try
+            cudensitymatDestroyOperator(x.handle)
+        catch
+        end
+        x.handle = C_NULL
+    end
+end
+
+Base.close(x::Operator) = _destroy!(x)
 Base.isopen(op::Operator) = op.handle != C_NULL
 
 """
@@ -623,16 +647,22 @@ mutable struct OperatorAction
             operators::Vector{Operator},
         )
         obj = new(handle, ws, operators)
-        finalizer(obj) do x
-            if x.handle != C_NULL
-                cudensitymatDestroyOperatorAction(x.handle)
-                x.handle = C_NULL
-            end
-        end
+        finalizer(_destroy!, obj)
         return obj
     end
 end
 
+function _destroy!(x::OperatorAction)
+    if x.handle != C_NULL
+        try
+            cudensitymatDestroyOperatorAction(x.handle)
+        catch
+        end
+        x.handle = C_NULL
+    end
+end
+
+Base.close(x::OperatorAction) = _destroy!(x)
 Base.isopen(a::OperatorAction) = a.handle != C_NULL
 
 function destroy_operator_action(action::OperatorAction)

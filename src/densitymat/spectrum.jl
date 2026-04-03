@@ -22,16 +22,22 @@ mutable struct OperatorSpectrum
             operator::Operator,
         )
         obj = new(handle, ws, operator)
-        finalizer(obj) do x
-            if x.handle != C_NULL
-                cudensitymatDestroyOperatorSpectrum(x.handle)
-                x.handle = C_NULL
-            end
-        end
+        finalizer(_destroy!, obj)
         return obj
     end
 end
 
+function _destroy!(x::OperatorSpectrum)
+    if x.handle != C_NULL
+        try
+            cudensitymatDestroyOperatorSpectrum(x.handle)
+        catch
+        end
+        x.handle = C_NULL
+    end
+end
+
+Base.close(x::OperatorSpectrum) = _destroy!(x)
 Base.isopen(s::OperatorSpectrum) = s.handle != C_NULL
 
 function destroy_operator_spectrum(s::OperatorSpectrum)

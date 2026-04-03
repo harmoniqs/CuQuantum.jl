@@ -87,14 +87,23 @@ function _destroy!(ws::WorkStream)
     if ws.workspace != C_NULL
         # Free workspace buffer first
         if ws.workspace_buffer !== nothing
-            CUDA.unsafe_free!(ws.workspace_buffer)
+            try
+                CUDA.unsafe_free!(ws.workspace_buffer)
+            catch
+            end
             ws.workspace_buffer = nothing
         end
-        cudensitymatDestroyWorkspace(ws.workspace)
+        try
+            cudensitymatDestroyWorkspace(ws.workspace)
+        catch
+        end
         ws.workspace = C_NULL
     end
     if ws.handle != C_NULL
-        destroy(ws.handle)
+        try
+            destroy(ws.handle)
+        catch
+        end
         ws.handle = C_NULL
     end
     return nothing

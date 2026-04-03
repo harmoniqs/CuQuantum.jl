@@ -80,15 +80,29 @@ mutable struct DensePureState{T} <: AbstractState{T}
             state_ref,
         )
         obj = new{T}(ws, dims, Int64(batch_size), state_ref[], nothing, false)
-        finalizer(obj) do x
-            if x.handle != C_NULL
-                cudensitymatDestroyState(x.handle)
-                x.handle = C_NULL
-            end
-        end
+        finalizer(_destroy!, obj)
         return obj
     end
 end
+
+function _destroy!(x::DensePureState)
+    if x.handle != C_NULL
+        try
+            cudensitymatDestroyState(x.handle)
+        catch
+        end
+        x.handle = C_NULL
+    end
+    if x._owns_storage && x.storage !== nothing
+        try
+            CUDA.unsafe_free!(x.storage)
+        catch
+        end
+        x.storage = nothing
+    end
+end
+
+Base.close(x::DensePureState) = _destroy!(x)
 
 """
     DenseMixedState{T}(ws, hilbert_space_dims; batch_size=1)
@@ -133,15 +147,29 @@ mutable struct DenseMixedState{T} <: AbstractState{T}
             state_ref,
         )
         obj = new{T}(ws, dims, Int64(batch_size), state_ref[], nothing, false)
-        finalizer(obj) do x
-            if x.handle != C_NULL
-                cudensitymatDestroyState(x.handle)
-                x.handle = C_NULL
-            end
-        end
+        finalizer(_destroy!, obj)
         return obj
     end
 end
+
+function _destroy!(x::DenseMixedState)
+    if x.handle != C_NULL
+        try
+            cudensitymatDestroyState(x.handle)
+        catch
+        end
+        x.handle = C_NULL
+    end
+    if x._owns_storage && x.storage !== nothing
+        try
+            CUDA.unsafe_free!(x.storage)
+        catch
+        end
+        x.storage = nothing
+    end
+end
+
+Base.close(x::DenseMixedState) = _destroy!(x)
 
 const DenseState{T} = Union{DensePureState{T}, DenseMixedState{T}}
 

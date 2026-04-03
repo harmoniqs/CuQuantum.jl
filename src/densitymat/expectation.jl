@@ -22,16 +22,22 @@ mutable struct Expectation
             operator::Operator,
         )
         obj = new(handle, ws, operator)
-        finalizer(obj) do x
-            if x.handle != C_NULL
-                cudensitymatDestroyExpectation(x.handle)
-                x.handle = C_NULL
-            end
-        end
+        finalizer(_destroy!, obj)
         return obj
     end
 end
 
+function _destroy!(x::Expectation)
+    if x.handle != C_NULL
+        try
+            cudensitymatDestroyExpectation(x.handle)
+        catch
+        end
+        x.handle = C_NULL
+    end
+end
+
+Base.close(x::Expectation) = _destroy!(x)
 Base.isopen(e::Expectation) = e.handle != C_NULL
 
 function destroy_expectation(e::Expectation)
