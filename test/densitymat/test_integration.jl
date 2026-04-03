@@ -588,7 +588,7 @@
         println("  P(|1,0>):      $(r6(pop_10[1])) -> $(r6(pop_10[end]))")
         println("  P(|0,1>):      $(r6(pop_01[1])) -> $(r6(pop_01[end]))")
         println("  P(|0,0>):      $(r6(pop_00[1])) -> $(r6(pop_00[end]))")
-        println("  Trajectory saved to trajectory.csv")
+        println("  Trajectory saved to temp file (cleaned up)")
     end
 
 end

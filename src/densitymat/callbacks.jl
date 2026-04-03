@@ -403,7 +403,7 @@ end
 # =============================================================================
 
 """
-    wrap_scalar_callback(f; gradient=nothing) -> (cb, gcb, refs)
+    wrap_scalar_callback(f; gradient=nothing) -> (cb, gcb, ref::CallbackRef)
 
 Wrap a Julia function as a scalar callback for time-dependent coefficients.
 
@@ -415,9 +415,10 @@ Wrap a Julia function as a scalar callback for time-dependent coefficients.
   `g(time::Float64, params::Matrix{Float64}, scalar_grad::Vector{T}, params_grad::Matrix{Float64})`
 
 # Returns
-- `cb::cudensitymatWrappedScalarCallback_t` — the callback struct
-- `gcb::cudensitymatWrappedScalarGradientCallback_t` — the gradient callback struct
-- `refs` — opaque reference holder (keep alive while callback is in use)
+- `cb::cudensitymatWrappedScalarCallback_t` — pass as `coefficient_callback` to `append_elementary_product!`
+- `gcb::cudensitymatWrappedScalarGradientCallback_t` — pass as `coefficient_gradient_callback`
+- `ref::CallbackRef` — keep alive while the callback is in use; call `close(ref)` to unregister early,
+  or rely on the finalizer for automatic cleanup
 
 # Example
 ```julia
@@ -429,7 +430,7 @@ function my_coeff(time, params, storage)
     end
 end
 
-cb, gcb, refs = wrap_scalar_callback(my_coeff)
+cb, gcb, ref = wrap_scalar_callback(my_coeff)
 ```
 """
 function wrap_scalar_callback(f::Function; gradient::Union{Nothing, Function} = nothing)
@@ -463,7 +464,7 @@ function wrap_scalar_callback(f::Function; gradient::Union{Nothing, Function} = 
 end
 
 """
-    wrap_tensor_callback(f; gradient=nothing) -> (cb, gcb, refs)
+    wrap_tensor_callback(f; gradient=nothing) -> (cb, gcb, ref::CallbackRef)
 
 Wrap a Julia function as a tensor callback for time-dependent operator elements.
 
@@ -474,9 +475,9 @@ Wrap a Julia function as a tensor callback for time-dependent operator elements.
 - `gradient`: Optional gradient function.
 
 # Returns
-- `cb::cudensitymatWrappedTensorCallback_t`
-- `gcb::cudensitymatWrappedTensorGradientCallback_t`
-- `refs` — opaque reference holder
+- `cb::cudensitymatWrappedTensorCallback_t` — pass as `tensor_callback` to `create_elementary_operator`
+- `gcb::cudensitymatWrappedTensorGradientCallback_t` — pass as `tensor_gradient_callback`
+- `ref::CallbackRef` — keep alive while the callback is in use; call `close(ref)` to unregister early
 """
 function wrap_tensor_callback(f::Function; gradient::Union{Nothing, Function} = nothing)
     if _cpu_tensor_wrapper_ptr[] == C_NULL
