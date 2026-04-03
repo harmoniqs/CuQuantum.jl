@@ -47,11 +47,11 @@ include("workspace.jl")
 # Quantum states (DensePureState, DenseMixedState)
 include("state.jl")
 
-# Operators (ElementaryOperator, OperatorTerm, Operator, OperatorAction)
-include("operators.jl")
-
 # Callbacks (time-dependent scalar/tensor coefficients)
 include("callbacks.jl")
+
+# Operators (ElementaryOperator, OperatorTerm, Operator, OperatorAction)
+include("operators.jl")
 
 # Expectation values
 include("expectation.jl")

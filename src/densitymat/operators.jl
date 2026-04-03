@@ -69,14 +69,14 @@ mutable struct ElementaryOperator
     handle::cudensitymatElementaryOperator_t
     ws::WorkStream
     # Keep references to data to prevent GC
-    _data_ref::Any
-    _callback_refs::Any
+    _data_ref::Union{Nothing, CUDA.CuArray}
+    _callback_refs::Union{Nothing, CallbackRef}
 
     function ElementaryOperator(
             handle::cudensitymatElementaryOperator_t,
             ws::WorkStream;
-            data_ref = nothing,
-            callback_refs = nothing,
+            data_ref::Union{Nothing, CUDA.CuArray} = nothing,
+            callback_refs::Union{Nothing, CallbackRef} = nothing,
         )
         obj = new(handle, ws, data_ref, callback_refs)
         finalizer(_destroy!, obj)
@@ -215,14 +215,14 @@ dense matrix operator stored locally on a single GPU.
 mutable struct MatrixOperator
     handle::cudensitymatMatrixOperator_t
     ws::WorkStream
-    _data_ref::Any
-    _callback_refs::Any
+    _data_ref::Union{Nothing, CUDA.CuArray}
+    _callback_refs::Union{Nothing, CallbackRef}
 
     function MatrixOperator(
             handle::cudensitymatMatrixOperator_t,
             ws::WorkStream;
-            data_ref = nothing,
-            callback_refs = nothing,
+            data_ref::Union{Nothing, CUDA.CuArray} = nothing,
+            callback_refs::Union{Nothing, CallbackRef} = nothing,
         )
         obj = new(handle, ws, data_ref, callback_refs)
         finalizer(_destroy!, obj)
@@ -329,16 +329,16 @@ mutable struct OperatorTerm
     ws::WorkStream
     hilbert_space_dims::Vector{Int64}
     # Keep refs to prevent GC of constituent operators
-    _elem_op_refs::Vector{Any}
-    _matrix_op_refs::Vector{Any}
-    _callback_refs::Vector{Any}
+    _elem_op_refs::Vector{ElementaryOperator}
+    _matrix_op_refs::Vector{MatrixOperator}
+    _callback_refs::Vector{CallbackRef}
 
     function OperatorTerm(
             handle::cudensitymatOperatorTerm_t,
             ws::WorkStream,
             dims::Vector{Int64},
         )
-        obj = new(handle, ws, dims, Any[], Any[], Any[])
+        obj = new(handle, ws, dims, ElementaryOperator[], MatrixOperator[], CallbackRef[])
         finalizer(_destroy!, obj)
         return obj
     end
@@ -518,10 +518,17 @@ mutable struct Operator
     handle::cudensitymatOperator_t
     ws::WorkStream
     hilbert_space_dims::Vector{Int64}
-    _term_refs::Vector{Any}
+    _term_refs::Vector{Tuple{OperatorTerm, ComplexF64}}
+    _batch_term_refs::Vector{Tuple{OperatorTerm, CUDA.CuVector{ComplexF64}}}
 
     function Operator(handle::cudensitymatOperator_t, ws::WorkStream, dims::Vector{Int64})
-        obj = new(handle, ws, dims, Any[])
+        obj = new(
+            handle,
+            ws,
+            dims,
+            Tuple{OperatorTerm, ComplexF64}[],
+            Tuple{OperatorTerm, CUDA.CuVector{ComplexF64}}[],
+        )
         finalizer(_destroy!, obj)
         return obj
     end
@@ -579,7 +586,7 @@ function append_term!(
         coefficient_callback,
         coefficient_gradient_callback,
     )
-    push!(op._term_refs, (term, coefficient))
+    push!(op._term_refs, (term, ComplexF64(coefficient)))
     return nothing
 end
 
@@ -615,7 +622,7 @@ function append_term_batch!(
         coefficient_callback,
         coefficient_gradient_callback,
     )
-    push!(op._term_refs, (term, static_coefficients, batch_size))
+    push!(op._batch_term_refs, (term, static_coefficients))
     return nothing
 end
 

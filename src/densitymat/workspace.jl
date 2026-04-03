@@ -38,7 +38,7 @@ mutable struct WorkStream
     comm_provider::cudensitymatDistributedProvider_t
     comm_set::Bool
     # Hold a reference to any comm data to prevent GC
-    _comm_ref::Any
+    _comm_ref::Union{Nothing, Vector{Int}}
 
     function WorkStream(;
             stream::Union{Nothing, CUDA.CuStream} = nothing,
@@ -181,14 +181,15 @@ function set_communicator!(
         # Convert integer to pointer if needed
         ptr = comm_ptr isa Ptr{Cvoid} ? comm_ptr : Ptr{Cvoid}(UInt(comm_ptr))
 
-        # For NCCL: store the pointer in a stable array to prevent GC
+        # Store the pointer in a stable Int array to prevent GC and ensure type stability
         if provider == :nccl
             holder = Int[Int(comm_ptr)]
             ws._comm_ref = holder
             ptr = Ptr{Cvoid}(pointer(holder))
             comm_size = sizeof(Int)
         else
-            ws._comm_ref = comm_ptr
+            holder = Int[Int(UInt(comm_ptr))]
+            ws._comm_ref = holder
         end
 
         cudensitymatResetDistributedConfiguration(ws.handle, prov, ptr, Csize_t(comm_size))
