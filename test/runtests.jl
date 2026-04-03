@@ -41,6 +41,9 @@ include("aqua.jl")
         # Phase 5: Callback tests
         include("densitymat/test_callbacks.jl")
 
+        # Phase 6: Batch operator construction and compute tests
+        include("densitymat/test_batch_operators.jl")
+
         # Phase 7: Gradient / backward differentiation tests
         include("densitymat/test_gradients.jl")
 

@@ -544,29 +544,31 @@
         # Write a simple CSV that can be plotted with any tool.
         # Columns: time, trace_real, pop_10, pop_01, pop_00, pop_20, pop_02
 
-        trajectory_file = joinpath(@__DIR__, "..", "..", "trajectory.csv")
-        open(trajectory_file, "w") do io
-            println(io, "time,trace_real,trace_imag,pop_10,pop_01,pop_00,pop_20,pop_02")
-            for i in eachindex(times)
-                println(
-                    io,
-                    join(
-                        [
-                            times[i],
-                            real(traces[i]),
-                            imag(traces[i]),
-                            pop_10[i],
-                            pop_01[i],
-                            pop_00[i],
-                            pop_20[i],
-                            pop_02[i],
-                        ],
-                        ",",
-                    ),
-                )
+        mktempdir() do tmpdir
+            trajectory_file = joinpath(tmpdir, "trajectory.csv")
+            open(trajectory_file, "w") do io
+                println(io, "time,trace_real,trace_imag,pop_10,pop_01,pop_00,pop_20,pop_02")
+                for i in eachindex(times)
+                    println(
+                        io,
+                        join(
+                            [
+                                times[i],
+                                real(traces[i]),
+                                imag(traces[i]),
+                                pop_10[i],
+                                pop_01[i],
+                                pop_00[i],
+                                pop_20[i],
+                                pop_02[i],
+                            ],
+                            ",",
+                        ),
+                    )
+                end
             end
+            @test isfile(trajectory_file)
         end
-        @test isfile(trajectory_file)
 
         # =====================================================================
         # 15. Cleanup
