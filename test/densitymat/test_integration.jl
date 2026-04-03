@@ -101,7 +101,7 @@
             0.0 0.0 0.0
         ]  # a as a proper matrix
         a_dag_matrix = transpose(a_matrix)  # a† (real operator, so transpose = adjoint)
-        for j1 = 1:d, j0 = 1:d, i1 = 1:d, i0 = 1:d
+        for j1 in 1:d, j0 in 1:d, i1 in 1:d, i0 in 1:d
             # F[i0, i1, j0, j1] = a[i0, j0] * a†[i1, j1]
             aa_dag_fused[i0, i1, j0, j1] = a_matrix[i0, j0] * a_dag_matrix[i1, j1]
         end
@@ -130,7 +130,7 @@
         #   C_10[i0, i1; j0, j1] = a[i0; j0] × a†[i1; j1]   (cavity 0 annihilation, cavity 1 creation)
         coupling_01 = zeros(T, d, d, d, d)  # a₀†a₁
         coupling_10 = zeros(T, d, d, d, d)  # a₁†a₀ = (a₀†a₁)†
-        for j1 = 1:d, j0 = 1:d, i1 = 1:d, i0 = 1:d
+        for j1 in 1:d, j0 in 1:d, i1 in 1:d, i0 in 1:d
             coupling_01[i0, i1, j0, j1] = a_dag_matrix[i0, j0] * a_matrix[i1, j1]
             coupling_10[i0, i1, j0, j1] = a_matrix[i0, j0] * a_dag_matrix[i1, j1]
         end
@@ -152,7 +152,7 @@
         # This is a static (time-independent) term.
         # We create one OperatorTerm and add the Kerr operator on each mode.
         kerr_term = CuDensityMat.create_operator_term(ws, dims)
-        for m = 0:(M-1)
+        for m in 0:(M - 1)
             CuDensityMat.append_elementary_product!(
                 kerr_term,
                 [elem_kerr],        # single Kerr operator
@@ -263,7 +263,7 @@
         # physical cavity m. This is the same pattern as the YY dissipation in
         # NVIDIA's C++ sample.
         dissipation_sandwich = CuDensityMat.create_operator_term(ws, dims)
-        for m = 0:(M-1)
+        for m in 0:(M - 1)
             CuDensityMat.append_elementary_product!(
                 dissipation_sandwich,
                 [elem_aa_dag],
@@ -278,7 +278,7 @@
         #   once with duality=0, coeff=-γ/2  (left: -½ n_m ρ)
         #   once with duality=1, coeff=-γ/2  (right: -½ ρ n_m)
         dissipation_number = CuDensityMat.create_operator_term(ws, dims)
-        for m = 0:(M-1)
+        for m in 0:(M - 1)
             CuDensityMat.append_elementary_product!(
                 dissipation_number,
                 [elem_n],
@@ -307,11 +307,11 @@
         # Hamiltonian: -i[H, ρ]
         # Each Hamiltonian term is appended twice (left and right of ρ)
         for (term, label) in [
-            (kerr_term, "Kerr"),
-            (detuning_term_1, "Detuning₁"),
-            (detuning_term_2, "Detuning₂"),
-            (coupling_term, "Coupling"),
-        ]
+                (kerr_term, "Kerr"),
+                (detuning_term_1, "Detuning₁"),
+                (detuning_term_2, "Detuning₂"),
+                (coupling_term, "Coupling"),
+            ]
             # -i × H × ρ  (acts from the left)
             CuDensityMat.append_term!(
                 liouvillian,
@@ -343,7 +343,7 @@
             liouvillian,
             dissipation_number;
             duality = 0,
-            coefficient = ComplexF64(-γ/2),
+            coefficient = ComplexF64(-γ / 2),
         )
 
         # Anticommutator: -γ/2 × ρ n_m  (right side)
@@ -351,7 +351,7 @@
             liouvillian,
             dissipation_number;
             duality = 1,
-            coefficient = ComplexF64(-γ/2),
+            coefficient = ComplexF64(-γ / 2),
         )
 
         # =====================================================================
@@ -370,7 +370,7 @@
 
         d_total = prod(dims)  # 9
         rho_init = zeros(T, d_total * d_total)
-        rho_init[2+d_total*(2-1)] = 1.0 + 0im  # ρ[|1,0⟩, |1,0⟩] = 1
+        rho_init[2 + d_total * (2 - 1)] = 1.0 + 0im  # ρ[|1,0⟩, |1,0⟩] = 1
         rho_init_gpu = CUDA.CuVector{T}(rho_init)
 
         rho = DenseMixedState{T}(ws, Tuple(dims); batch_size = 1)
@@ -437,7 +437,7 @@
             d_tot = d_total
 
             push!(times, t)
-            tr = sum(rho_cpu[k+d_tot*(k-1)] for k = 1:d_tot)
+            tr = sum(rho_cpu[k + d_tot * (k - 1)] for k in 1:d_tot)
             push!(traces, tr)
 
             # Fock state indices: |n₁,n₂⟩ → flat index = n₁ + d*n₂ + 1 (1-based)
@@ -447,11 +447,11 @@
             idx_20 = 1 + 2 + d * 0  # |2,0⟩
             idx_02 = 1 + 0 + d * 2  # |0,2⟩
 
-            push!(pop_10, real(rho_cpu[idx_10+d_tot*(idx_10-1)]))
-            push!(pop_01, real(rho_cpu[idx_01+d_tot*(idx_01-1)]))
-            push!(pop_00, real(rho_cpu[idx_00+d_tot*(idx_00-1)]))
-            push!(pop_20, real(rho_cpu[idx_20+d_tot*(idx_20-1)]))
-            push!(pop_02, real(rho_cpu[idx_02+d_tot*(idx_02-1)]))
+            push!(pop_10, real(rho_cpu[idx_10 + d_tot * (idx_10 - 1)]))
+            push!(pop_01, real(rho_cpu[idx_01 + d_tot * (idx_01 - 1)]))
+            push!(pop_00, real(rho_cpu[idx_00 + d_tot * (idx_00 - 1)]))
+            push!(pop_20, real(rho_cpu[idx_20 + d_tot * (idx_20 - 1)]))
+            push!(pop_02, real(rho_cpu[idx_02 + d_tot * (idx_02 - 1)]))
         end
 
         # Helper: copy state a into state b (GPU-to-GPU)
@@ -475,7 +475,7 @@
         # Record initial state
         record_observables!(0.0, rho)
 
-        for step = 1:n_steps
+        for step in 1:n_steps
             t = (step - 1) * dt
 
             # --- k1 = L(t, ρ) ---
@@ -483,13 +483,13 @@
 
             # --- k2 = L(t + dt/2, ρ + dt/2 × k1) ---
             copy_state!(rho_tmp, rho)
-            CuDensityMat.inplace_accumulate!(rho_tmp, k1, ComplexF64(dt/2))
-            eval_liouvillian!(k2, rho_tmp, t + dt/2)
+            CuDensityMat.inplace_accumulate!(rho_tmp, k1, ComplexF64(dt / 2))
+            eval_liouvillian!(k2, rho_tmp, t + dt / 2)
 
             # --- k3 = L(t + dt/2, ρ + dt/2 × k2) ---
             copy_state!(rho_tmp, rho)
-            CuDensityMat.inplace_accumulate!(rho_tmp, k2, ComplexF64(dt/2))
-            eval_liouvillian!(k3, rho_tmp, t + dt/2)
+            CuDensityMat.inplace_accumulate!(rho_tmp, k2, ComplexF64(dt / 2))
+            eval_liouvillian!(k3, rho_tmp, t + dt / 2)
 
             # --- k4 = L(t + dt, ρ + dt × k3) ---
             copy_state!(rho_tmp, rho)
@@ -497,10 +497,10 @@
             eval_liouvillian!(k4, rho_tmp, t + dt)
 
             # --- ρ(t+dt) = ρ(t) + (dt/6)(k1 + 2k2 + 2k3 + k4) ---
-            CuDensityMat.inplace_accumulate!(rho, k1, ComplexF64(dt/6))
-            CuDensityMat.inplace_accumulate!(rho, k2, ComplexF64(dt/3))
-            CuDensityMat.inplace_accumulate!(rho, k3, ComplexF64(dt/3))
-            CuDensityMat.inplace_accumulate!(rho, k4, ComplexF64(dt/6))
+            CuDensityMat.inplace_accumulate!(rho, k1, ComplexF64(dt / 6))
+            CuDensityMat.inplace_accumulate!(rho, k2, ComplexF64(dt / 3))
+            CuDensityMat.inplace_accumulate!(rho, k3, ComplexF64(dt / 3))
+            CuDensityMat.inplace_accumulate!(rho, k4, ComplexF64(dt / 6))
 
             # Record at every step (100 total data points — enough for smooth plots)
             record_observables!(step * dt, rho)
@@ -514,9 +514,9 @@
         @test length(times) > 10
 
         # (b) Initial state was |1,0⟩⟨1,0|
-        @test abs(pop_10[1] - 1.0) < 1e-10
-        @test abs(pop_01[1]) < 1e-10
-        @test abs(pop_00[1]) < 1e-10
+        @test abs(pop_10[1] - 1.0) < 1.0e-10
+        @test abs(pop_01[1]) < 1.0e-10
+        @test abs(pop_00[1]) < 1.0e-10
 
         # (c) Trace should be preserved (≈ 1) throughout — Lindblad preserves trace.
         # RK4 is much more accurate than Euler, so tighter tolerance is reasonable.

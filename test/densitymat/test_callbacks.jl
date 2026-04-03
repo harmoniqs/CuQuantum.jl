@@ -91,7 +91,7 @@
         T = ComplexF64
 
         # sigma_z operator
-        sigma_z_data = CUDA.CuVector{T}([1.0+0im, 0.0, 0.0, -1.0+0im])
+        sigma_z_data = CUDA.CuVector{T}([1.0 + 0im, 0.0, 0.0, -1.0 + 0im])
         elem = CuDensityMat.create_elementary_operator(ws, [2], sigma_z_data)
 
         # Create term with sigma_z on mode 0
@@ -114,7 +114,7 @@
             operator,
             term;
             duality = 0,
-            coefficient = 1.0+0im,
+            coefficient = 1.0 + 0im,
             coefficient_callback = cb,
             coefficient_gradient_callback = gcb,
         )

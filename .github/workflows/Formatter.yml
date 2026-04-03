@@ -6,36 +6,24 @@ on:
       - main
   workflow_dispatch:
 jobs:
-  julia-format:
-    name: Formatter
+  runic:
+    name: Runic formatting check
     runs-on: ubuntu-latest
     steps:
-      - uses: julia-actions/setup-julia@latest
       - uses: actions/checkout@v6
+      - uses: fredrikekre/runic-action@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install JuliaFormatter and format
-        run: |
-          julia --color=yes -e 'using Pkg; Pkg.add(PackageSpec(name="JuliaFormatter"))'
-          julia --color=yes -e 'using JuliaFormatter; format(".", verbose=true)'
+          version: '1'
+          args: >-
+            ${{ github.event_name == 'workflow_dispatch'
+              && '--inplace src/ test/ docs/src/'
+              || '--check src/ test/ docs/src/' }}
       - name: Commit formatted code
         if: github.event_name == 'workflow_dispatch'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git diff --quiet && exit 0
-          git add -A
-          git commit -m "chore: autoformat"
+          git add src/ test/ docs/src/
+          git commit -m "chore: runic autoformat"
           git push
-      - name: Format check
-        if: github.event_name != 'workflow_dispatch'
-        run: |
-          julia --color=yes -e '
-          out = Cmd(`git diff --name-only`) |> read |> String
-          if out == ""
-            exit(0)
-          else
-            @error "Some files have not been formatted !!!"
-            write(stdout, out)
-            exit(1)
-          end'

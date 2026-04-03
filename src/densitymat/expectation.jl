@@ -17,10 +17,10 @@ mutable struct Expectation
     _operator_ref::Operator
 
     function Expectation(
-        handle::cudensitymatExpectation_t,
-        ws::WorkStream,
-        operator::Operator,
-    )
+            handle::cudensitymatExpectation_t,
+            ws::WorkStream,
+            operator::Operator,
+        )
         obj = new(handle, ws, operator)
         finalizer(obj) do x
             if x.handle != C_NULL
@@ -35,7 +35,7 @@ end
 Base.isopen(e::Expectation) = e.handle != C_NULL
 
 function destroy_expectation(e::Expectation)
-    if e.handle != C_NULL
+    return if e.handle != C_NULL
         cudensitymatDestroyExpectation(e.handle)
         e.handle = C_NULL
     end
@@ -60,12 +60,12 @@ end
 Prepare expectation value computation (one-time setup).
 """
 function prepare_expectation!(
-    ws::WorkStream,
-    expectation::Expectation,
-    state::AbstractState;
-    compute_type::cudensitymatComputeType_t = CUDENSITYMAT_COMPUTE_64F,
-    workspace_limit::Union{Nothing,Integer} = nothing,
-)
+        ws::WorkStream,
+        expectation::Expectation,
+        state::AbstractState;
+        compute_type::cudensitymatComputeType_t = CUDENSITYMAT_COMPUTE_64F,
+        workspace_limit::Union{Nothing, Integer} = nothing,
+    )
     _check_valid(ws)
     mem_limit = _get_workspace_limit(ws, workspace_limit)
     cudensitymatExpectationPrepare(
@@ -95,15 +95,15 @@ Compute expectation value: result = Tr(operator * state).
   use `CuVector{ComplexF64}` of length `batch_size`.
 """
 function compute_expectation!(
-    ws::WorkStream,
-    expectation::Expectation,
-    state::AbstractState,
-    result::CUDA.CuArray;
-    time::Real = 0.0,
-    batch_size::Integer = 1,
-    num_params::Integer = 0,
-    params::Union{Nothing,CUDA.CuVector{Float64}} = nothing,
-)
+        ws::WorkStream,
+        expectation::Expectation,
+        state::AbstractState,
+        result::CUDA.CuArray;
+        time::Real = 0.0,
+        batch_size::Integer = 1,
+        num_params::Integer = 0,
+        params::Union{Nothing, CUDA.CuVector{Float64}} = nothing,
+    )
     _check_valid(ws)
     params_ptr = params === nothing ? CUDA.CU_NULL : pointer(params)
     cudensitymatExpectationCompute(

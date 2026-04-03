@@ -8,7 +8,7 @@
         T = ComplexF64
 
         # Build sigma_z operator
-        data = CUDA.CuVector{T}([1.0+0im, 0.0, 0.0, -1.0+0im])
+        data = CUDA.CuVector{T}([1.0 + 0im, 0.0, 0.0, -1.0 + 0im])
         elem = CuDensityMat.create_elementary_operator(ws, [2], data)
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
@@ -28,7 +28,7 @@
         T = ComplexF64
 
         # sigma_z = diag(1, -1)
-        data = CUDA.CuVector{T}([1.0+0im, 0.0, 0.0, -1.0+0im])
+        data = CUDA.CuVector{T}([1.0 + 0im, 0.0, 0.0, -1.0 + 0im])
         elem = CuDensityMat.create_elementary_operator(ws, [2], data)
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
@@ -48,8 +48,8 @@
 
         # Tr(sigma_z * |0><0|) = Tr(diag(1,-1) * diag(1,0)) = 1
         val = Array(result)
-        @test abs(real(val[1]) - 1.0) < 1e-10
-        @test abs(imag(val[1])) < 1e-10
+        @test abs(real(val[1]) - 1.0) < 1.0e-10
+        @test abs(imag(val[1])) < 1.0e-10
 
         CuDensityMat.destroy_expectation(exp)
         close(ws)
@@ -61,7 +61,7 @@
         T = ComplexF64
 
         # sigma_z
-        data = CUDA.CuVector{T}([1.0+0im, 0.0, 0.0, -1.0+0im])
+        data = CUDA.CuVector{T}([1.0 + 0im, 0.0, 0.0, -1.0 + 0im])
         elem = CuDensityMat.create_elementary_operator(ws, [2], data)
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
@@ -80,8 +80,8 @@
 
         # Tr(sigma_z * |1><1|) = Tr(diag(1,-1) * diag(0,1)) = -1
         val = Array(result)
-        @test abs(real(val[1]) - (-1.0)) < 1e-10
-        @test abs(imag(val[1])) < 1e-10
+        @test abs(real(val[1]) - (-1.0)) < 1.0e-10
+        @test abs(imag(val[1])) < 1.0e-10
 
         CuDensityMat.destroy_expectation(exp)
         close(ws)
@@ -93,7 +93,7 @@
         T = ComplexF64
 
         # identity operator = diag(1, 1)
-        data = CUDA.CuVector{T}([1.0+0im, 0.0, 0.0, 1.0+0im])
+        data = CUDA.CuVector{T}([1.0 + 0im, 0.0, 0.0, 1.0 + 0im])
         elem = CuDensityMat.create_elementary_operator(ws, [2], data)
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
@@ -112,7 +112,7 @@
 
         # Tr(I * I/2) = Tr(I/2) = 1
         val = Array(result)
-        @test abs(real(val[1]) - 1.0) < 1e-10
+        @test abs(real(val[1]) - 1.0) < 1.0e-10
 
         CuDensityMat.destroy_expectation(exp)
         close(ws)

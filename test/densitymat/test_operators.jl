@@ -118,7 +118,7 @@
         # Assemble operator
         operator = CuDensityMat.create_operator(ws, dims)
         CuDensityMat.append_term!(operator, term1; duality = 0, coefficient = 1.0)
-        CuDensityMat.append_term!(operator, term2; duality = 1, coefficient = 0.5+0.1im)
+        CuDensityMat.append_term!(operator, term2; duality = 1, coefficient = 0.5 + 0.1im)
         @test length(operator._term_refs) == 2
 
         CuDensityMat.destroy_operator(operator)
@@ -149,7 +149,7 @@
         T = ComplexF64
 
         # Build a simple operator: sigma_z = diag(1, -1)
-        sigma_z_data = CUDA.CuVector{T}([1.0+0im, 0.0, 0.0, -1.0+0im])
+        sigma_z_data = CUDA.CuVector{T}([1.0 + 0im, 0.0, 0.0, -1.0 + 0im])
         elem = CuDensityMat.create_elementary_operator(ws, [2], sigma_z_data)
 
         term = CuDensityMat.create_operator_term(ws, dims)
@@ -194,8 +194,8 @@
         T = ComplexF64
 
         # Two operators
-        sigma_z_data = CUDA.CuVector{T}([1.0+0im, 0.0, 0.0, -1.0+0im])
-        sigma_x_data = CUDA.CuVector{T}([0.0+0im, 1.0, 1.0, 0.0+0im])
+        sigma_z_data = CUDA.CuVector{T}([1.0 + 0im, 0.0, 0.0, -1.0 + 0im])
+        sigma_x_data = CUDA.CuVector{T}([0.0 + 0im, 1.0, 1.0, 0.0 + 0im])
 
         elem_z = CuDensityMat.create_elementary_operator(ws, [2], sigma_z_data)
         elem_x = CuDensityMat.create_elementary_operator(ws, [2], sigma_x_data)

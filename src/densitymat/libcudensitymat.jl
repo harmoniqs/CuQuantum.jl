@@ -39,11 +39,11 @@ end
 # ============================================================================
 
 @checked function cudensitymatResetDistributedConfiguration(
-    handle,
-    provider,
-    commPtr,
-    commSize,
-)
+        handle,
+        provider,
+        commPtr,
+        commSize,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatResetDistributedConfiguration(
         handle::cudensitymatHandle_t,
@@ -89,12 +89,12 @@ end
 end
 
 @checked function cudensitymatWorkspaceGetMemorySize(
-    handle,
-    workspaceDescr,
-    memSpace,
-    workspaceKind,
-    memoryBufferSize,
-)
+        handle,
+        workspaceDescr,
+        memSpace,
+        workspaceKind,
+        memoryBufferSize,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatWorkspaceGetMemorySize(
         handle::cudensitymatHandle_t,
@@ -106,13 +106,13 @@ end
 end
 
 @checked function cudensitymatWorkspaceSetMemory(
-    handle,
-    workspaceDescr,
-    memSpace,
-    workspaceKind,
-    memoryBuffer,
-    memoryBufferSize,
-)
+        handle,
+        workspaceDescr,
+        memSpace,
+        workspaceKind,
+        memoryBuffer,
+        memoryBufferSize,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatWorkspaceSetMemory(
         handle::cudensitymatHandle_t,
@@ -125,13 +125,13 @@ end
 end
 
 @checked function cudensitymatWorkspaceGetMemory(
-    handle,
-    workspaceDescr,
-    memSpace,
-    workspaceKind,
-    memoryBuffer,
-    memoryBufferSize,
-)
+        handle,
+        workspaceDescr,
+        memSpace,
+        workspaceKind,
+        memoryBuffer,
+        memoryBufferSize,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatWorkspaceGetMemory(
         handle::cudensitymatHandle_t,
@@ -148,14 +148,14 @@ end
 # ============================================================================
 
 @checked function cudensitymatCreateState(
-    handle,
-    purity,
-    numSpaceModes,
-    spaceModeExtents,
-    batchSize,
-    dataType,
-    state,
-)
+        handle,
+        purity,
+        numSpaceModes,
+        spaceModeExtents,
+        batchSize,
+        dataType,
+        state,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatCreateState(
         handle::cudensitymatHandle_t,
@@ -185,11 +185,11 @@ end
 end
 
 @checked function cudensitymatStateGetComponentStorageSize(
-    handle,
-    state,
-    numStateComponents,
-    componentBufferSize,
-)
+        handle,
+        state,
+        numStateComponents,
+        componentBufferSize,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatStateGetComponentStorageSize(
         handle::cudensitymatHandle_t,
@@ -200,13 +200,13 @@ end
 end
 
 @checked function cudensitymatStateGetComponentNumModes(
-    handle,
-    state,
-    stateComponentLocalId,
-    stateComponentGlobalId,
-    stateComponentNumModes,
-    batchModeLocation,
-)
+        handle,
+        state,
+        stateComponentLocalId,
+        stateComponentGlobalId,
+        stateComponentNumModes,
+        batchModeLocation,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatStateGetComponentNumModes(
         handle::cudensitymatHandle_t,
@@ -219,14 +219,14 @@ end
 end
 
 @checked function cudensitymatStateGetComponentInfo(
-    handle,
-    state,
-    stateComponentLocalId,
-    stateComponentGlobalId,
-    stateComponentNumModes,
-    stateComponentModeExtents,
-    stateComponentModeOffsets,
-)
+        handle,
+        state,
+        stateComponentLocalId,
+        stateComponentGlobalId,
+        stateComponentNumModes,
+        stateComponentModeExtents,
+        stateComponentModeOffsets,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatStateGetComponentInfo(
         handle::cudensitymatHandle_t,
@@ -240,12 +240,12 @@ end
 end
 
 @checked function cudensitymatStateAttachComponentStorage(
-    handle,
-    state,
-    numStateComponents,
-    componentBuffer,
-    componentBufferSize,
-)
+        handle,
+        state,
+        numStateComponents,
+        componentBuffer,
+        componentBufferSize,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatStateAttachComponentStorage(
         handle::cudensitymatHandle_t,
@@ -296,12 +296,12 @@ end
 end
 
 @checked function cudensitymatStateComputeAccumulation(
-    handle,
-    stateIn,
-    stateOut,
-    scalingFactors,
-    stream,
-)
+        handle,
+        stateIn,
+        stateOut,
+        scalingFactors,
+        stream,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatStateComputeAccumulation(
         handle::cudensitymatHandle_t,
@@ -313,12 +313,12 @@ end
 end
 
 @checked function cudensitymatStateComputeInnerProduct(
-    handle,
-    stateLeft,
-    stateRight,
-    innerProduct,
-    stream,
-)
+        handle,
+        stateLeft,
+        stateRight,
+        innerProduct,
+        stream,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatStateComputeInnerProduct(
         handle::cudensitymatHandle_t,
@@ -334,18 +334,18 @@ end
 # ============================================================================
 
 @checked function cudensitymatCreateElementaryOperator(
-    handle,
-    numSpaceModes,
-    spaceModeExtents,
-    sparsity,
-    numDiagonals,
-    diagonalOffsets,
-    dataType,
-    tensorData,
-    tensorCallback,
-    tensorGradientCallback,
-    elemOperator,
-)
+        handle,
+        numSpaceModes,
+        spaceModeExtents,
+        sparsity,
+        numDiagonals,
+        diagonalOffsets,
+        dataType,
+        tensorData,
+        tensorCallback,
+        tensorGradientCallback,
+        elemOperator,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatCreateElementaryOperator(
         handle::cudensitymatHandle_t,
@@ -363,19 +363,19 @@ end
 end
 
 @checked function cudensitymatCreateElementaryOperatorBatch(
-    handle,
-    numSpaceModes,
-    spaceModeExtents,
-    batchSize,
-    sparsity,
-    numDiagonals,
-    diagonalOffsets,
-    dataType,
-    tensorData,
-    tensorCallback,
-    tensorGradientCallback,
-    elemOperator,
-)
+        handle,
+        numSpaceModes,
+        spaceModeExtents,
+        batchSize,
+        sparsity,
+        numDiagonals,
+        diagonalOffsets,
+        dataType,
+        tensorData,
+        tensorCallback,
+        tensorGradientCallback,
+        elemOperator,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatCreateElementaryOperatorBatch(
         handle::cudensitymatHandle_t,
@@ -405,15 +405,15 @@ end
 # ============================================================================
 
 @checked function cudensitymatCreateMatrixOperatorDenseLocal(
-    handle,
-    numSpaceModes,
-    spaceModeExtents,
-    dataType,
-    matrixData,
-    tensorCallback,
-    tensorGradientCallback,
-    matrixOperator,
-)
+        handle,
+        numSpaceModes,
+        spaceModeExtents,
+        dataType,
+        matrixData,
+        tensorCallback,
+        tensorGradientCallback,
+        matrixOperator,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatCreateMatrixOperatorDenseLocal(
         handle::cudensitymatHandle_t,
@@ -428,16 +428,16 @@ end
 end
 
 @checked function cudensitymatCreateMatrixOperatorDenseLocalBatch(
-    handle,
-    numSpaceModes,
-    spaceModeExtents,
-    batchSize,
-    dataType,
-    matrixData,
-    tensorCallback,
-    tensorGradientCallback,
-    matrixOperator,
-)
+        handle,
+        numSpaceModes,
+        spaceModeExtents,
+        batchSize,
+        dataType,
+        matrixData,
+        tensorCallback,
+        tensorGradientCallback,
+        matrixOperator,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatCreateMatrixOperatorDenseLocalBatch(
         handle::cudensitymatHandle_t,
@@ -464,11 +464,11 @@ end
 # ============================================================================
 
 @checked function cudensitymatCreateOperatorTerm(
-    handle,
-    numSpaceModes,
-    spaceModeExtents,
-    operatorTerm,
-)
+        handle,
+        numSpaceModes,
+        spaceModeExtents,
+        operatorTerm,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatCreateOperatorTerm(
         handle::cudensitymatHandle_t,
@@ -486,16 +486,16 @@ end
 end
 
 @checked function cudensitymatOperatorTermAppendElementaryProduct(
-    handle,
-    operatorTerm,
-    numElemOperators,
-    elemOperators,
-    stateModesActedOn,
-    modeActionDuality,
-    coefficient,
-    coefficientCallback,
-    coefficientGradientCallback,
-)
+        handle,
+        operatorTerm,
+        numElemOperators,
+        elemOperators,
+        stateModesActedOn,
+        modeActionDuality,
+        coefficient,
+        coefficientCallback,
+        coefficientGradientCallback,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatOperatorTermAppendElementaryProduct(
         handle::cudensitymatHandle_t,
@@ -511,18 +511,18 @@ end
 end
 
 @checked function cudensitymatOperatorTermAppendElementaryProductBatch(
-    handle,
-    operatorTerm,
-    numElemOperators,
-    elemOperators,
-    stateModesActedOn,
-    modeActionDuality,
-    batchSize,
-    staticCoefficients,
-    totalCoefficients,
-    coefficientCallback,
-    coefficientGradientCallback,
-)
+        handle,
+        operatorTerm,
+        numElemOperators,
+        elemOperators,
+        stateModesActedOn,
+        modeActionDuality,
+        batchSize,
+        staticCoefficients,
+        totalCoefficients,
+        coefficientCallback,
+        coefficientGradientCallback,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatOperatorTermAppendElementaryProductBatch(
         handle::cudensitymatHandle_t,
@@ -540,16 +540,16 @@ end
 end
 
 @checked function cudensitymatOperatorTermAppendMatrixProduct(
-    handle,
-    operatorTerm,
-    numMatrixOperators,
-    matrixOperators,
-    matrixConjugation,
-    actionDuality,
-    coefficient,
-    coefficientCallback,
-    coefficientGradientCallback,
-)
+        handle,
+        operatorTerm,
+        numMatrixOperators,
+        matrixOperators,
+        matrixConjugation,
+        actionDuality,
+        coefficient,
+        coefficientCallback,
+        coefficientGradientCallback,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatOperatorTermAppendMatrixProduct(
         handle::cudensitymatHandle_t,
@@ -565,18 +565,18 @@ end
 end
 
 @checked function cudensitymatOperatorTermAppendMatrixProductBatch(
-    handle,
-    operatorTerm,
-    numMatrixOperators,
-    matrixOperators,
-    matrixConjugation,
-    actionDuality,
-    batchSize,
-    staticCoefficients,
-    totalCoefficients,
-    coefficientCallback,
-    coefficientGradientCallback,
-)
+        handle,
+        operatorTerm,
+        numMatrixOperators,
+        matrixOperators,
+        matrixConjugation,
+        actionDuality,
+        batchSize,
+        staticCoefficients,
+        totalCoefficients,
+        coefficientCallback,
+        coefficientGradientCallback,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatOperatorTermAppendMatrixProductBatch(
         handle::cudensitymatHandle_t,
@@ -598,11 +598,11 @@ end
 # ============================================================================
 
 @checked function cudensitymatCreateOperator(
-    handle,
-    numSpaceModes,
-    spaceModeExtents,
-    operator,
-)
+        handle,
+        numSpaceModes,
+        spaceModeExtents,
+        operator,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatCreateOperator(
         handle::cudensitymatHandle_t,
@@ -620,14 +620,14 @@ end
 end
 
 @checked function cudensitymatOperatorAppendTerm(
-    handle,
-    superoperator,
-    operatorTerm,
-    duality,
-    coefficient,
-    coefficientCallback,
-    coefficientGradientCallback,
-)
+        handle,
+        superoperator,
+        operatorTerm,
+        duality,
+        coefficient,
+        coefficientCallback,
+        coefficientGradientCallback,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatOperatorAppendTerm(
         handle::cudensitymatHandle_t,
@@ -641,16 +641,16 @@ end
 end
 
 @checked function cudensitymatOperatorAppendTermBatch(
-    handle,
-    superoperator,
-    operatorTerm,
-    duality,
-    batchSize,
-    staticCoefficients,
-    totalCoefficients,
-    coefficientCallback,
-    coefficientGradientCallback,
-)
+        handle,
+        superoperator,
+        operatorTerm,
+        duality,
+        batchSize,
+        staticCoefficients,
+        totalCoefficients,
+        coefficientCallback,
+        coefficientGradientCallback,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatOperatorAppendTermBatch(
         handle::cudensitymatHandle_t,
@@ -670,15 +670,15 @@ end
 # ============================================================================
 
 @checked function cudensitymatOperatorPrepareAction(
-    handle,
-    superoperator,
-    stateIn,
-    stateOut,
-    computeType,
-    workspaceSizeLimit,
-    workspace,
-    stream,
-)
+        handle,
+        superoperator,
+        stateIn,
+        stateOut,
+        computeType,
+        workspaceSizeLimit,
+        workspace,
+        stream,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatOperatorPrepareAction(
         handle::cudensitymatHandle_t,
@@ -693,17 +693,17 @@ end
 end
 
 @checked function cudensitymatOperatorComputeAction(
-    handle,
-    superoperator,
-    time,
-    batchSize,
-    numParams,
-    params,
-    stateIn,
-    stateOut,
-    workspace,
-    stream,
-)
+        handle,
+        superoperator,
+        time,
+        batchSize,
+        numParams,
+        params,
+        stateIn,
+        stateOut,
+        workspace,
+        stream,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatOperatorComputeAction(
         handle::cudensitymatHandle_t,
@@ -724,15 +724,15 @@ end
 # ============================================================================
 
 @checked function cudensitymatOperatorPrepareActionBackwardDiff(
-    handle,
-    superoperator,
-    stateIn,
-    stateOutAdj,
-    computeType,
-    workspaceSizeLimit,
-    workspace,
-    stream,
-)
+        handle,
+        superoperator,
+        stateIn,
+        stateOutAdj,
+        computeType,
+        workspaceSizeLimit,
+        workspace,
+        stream,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatOperatorPrepareActionBackwardDiff(
         handle::cudensitymatHandle_t,
@@ -747,19 +747,19 @@ end
 end
 
 @checked function cudensitymatOperatorComputeActionBackwardDiff(
-    handle,
-    superoperator,
-    time,
-    batchSize,
-    numParams,
-    params,
-    stateIn,
-    stateOutAdj,
-    stateInAdj,
-    paramsGrad,
-    workspace,
-    stream,
-)
+        handle,
+        superoperator,
+        time,
+        batchSize,
+        numParams,
+        params,
+        stateIn,
+        stateOutAdj,
+        stateInAdj,
+        paramsGrad,
+        workspace,
+        stream,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatOperatorComputeActionBackwardDiff(
         handle::cudensitymatHandle_t,
@@ -782,11 +782,11 @@ end
 # ============================================================================
 
 @checked function cudensitymatCreateOperatorAction(
-    handle,
-    numOperators,
-    operators,
-    operatorAction,
-)
+        handle,
+        numOperators,
+        operators,
+        operatorAction,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatCreateOperatorAction(
         handle::cudensitymatHandle_t,
@@ -804,15 +804,15 @@ end
 end
 
 @checked function cudensitymatOperatorActionPrepare(
-    handle,
-    operatorAction,
-    stateIn,
-    stateOut,
-    computeType,
-    workspaceSizeLimit,
-    workspace,
-    stream,
-)
+        handle,
+        operatorAction,
+        stateIn,
+        stateOut,
+        computeType,
+        workspaceSizeLimit,
+        workspace,
+        stream,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatOperatorActionPrepare(
         handle::cudensitymatHandle_t,
@@ -827,17 +827,17 @@ end
 end
 
 @checked function cudensitymatOperatorActionCompute(
-    handle,
-    operatorAction,
-    time,
-    batchSize,
-    numParams,
-    params,
-    stateIn,
-    stateOut,
-    workspace,
-    stream,
-)
+        handle,
+        operatorAction,
+        time,
+        batchSize,
+        numParams,
+        params,
+        stateIn,
+        stateOut,
+        workspace,
+        stream,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatOperatorActionCompute(
         handle::cudensitymatHandle_t,
@@ -874,14 +874,14 @@ end
 end
 
 @checked function cudensitymatExpectationPrepare(
-    handle,
-    expectation,
-    state,
-    computeType,
-    workspaceSizeLimit,
-    workspace,
-    stream,
-)
+        handle,
+        expectation,
+        state,
+        computeType,
+        workspaceSizeLimit,
+        workspace,
+        stream,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatExpectationPrepare(
         handle::cudensitymatHandle_t,
@@ -895,17 +895,17 @@ end
 end
 
 @checked function cudensitymatExpectationCompute(
-    handle,
-    expectation,
-    time,
-    batchSize,
-    numParams,
-    params,
-    state,
-    expectationValue,
-    workspace,
-    stream,
-)
+        handle,
+        expectation,
+        time,
+        batchSize,
+        numParams,
+        params,
+        state,
+        expectationValue,
+        workspace,
+        stream,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatExpectationCompute(
         handle::cudensitymatHandle_t,
@@ -926,12 +926,12 @@ end
 # ============================================================================
 
 @checked function cudensitymatCreateOperatorSpectrum(
-    handle,
-    superoperator,
-    isHermitian,
-    spectrumKind,
-    spectrum,
-)
+        handle,
+        superoperator,
+        isHermitian,
+        spectrumKind,
+        spectrum,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatCreateOperatorSpectrum(
         handle::cudensitymatHandle_t,
@@ -950,12 +950,12 @@ end
 end
 
 @checked function cudensitymatOperatorSpectrumConfigure(
-    handle,
-    spectrum,
-    attribute,
-    attributeValue,
-    attributeValueSize,
-)
+        handle,
+        spectrum,
+        attribute,
+        attributeValue,
+        attributeValueSize,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatOperatorSpectrumConfigure(
         handle::cudensitymatHandle_t,
@@ -967,15 +967,15 @@ end
 end
 
 @checked function cudensitymatOperatorSpectrumPrepare(
-    handle,
-    spectrum,
-    maxEigenStates,
-    state,
-    computeType,
-    workspaceSizeLimit,
-    workspace,
-    stream,
-)
+        handle,
+        spectrum,
+        maxEigenStates,
+        state,
+        computeType,
+        workspaceSizeLimit,
+        workspace,
+        stream,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatOperatorSpectrumPrepare(
         handle::cudensitymatHandle_t,
@@ -990,19 +990,19 @@ end
 end
 
 @checked function cudensitymatOperatorSpectrumCompute(
-    handle,
-    spectrum,
-    time,
-    batchSize,
-    numParams,
-    params,
-    numEigenStates,
-    eigenstates,
-    eigenvalues,
-    tolerances,
-    workspace,
-    stream,
-)
+        handle,
+        spectrum,
+        time,
+        batchSize,
+        numParams,
+        params,
+        numEigenStates,
+        eigenstates,
+        eigenvalues,
+        tolerances,
+        workspace,
+        stream,
+    )
     initialize_context()
     @gcsafe_ccall libcudensitymat.cudensitymatOperatorSpectrumCompute(
         handle::cudensitymatHandle_t,
@@ -1025,5 +1025,5 @@ end
 # ============================================================================
 
 function cudensitymatGetVersion()
-    @gcsafe_ccall libcudensitymat.cudensitymatGetVersion()::Csize_t
+    return @gcsafe_ccall libcudensitymat.cudensitymatGetVersion()::Csize_t
 end

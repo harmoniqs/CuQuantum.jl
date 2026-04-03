@@ -168,7 +168,7 @@
         copyto!(rho_in.storage, CUDA.CuVector{T}(rho_in_data))
 
         # Adjoint of output: pick a fixed "seed" for the VJP
-        rho_out_adj_data = T[1.0, 0.2+0.1im, 0.2-0.1im, 0.5]
+        rho_out_adj_data = T[1.0, 0.2 + 0.1im, 0.2 - 0.1im, 0.5]
 
         θ₀ = 1.5
 
@@ -219,7 +219,7 @@
         backward_grad = Array(params_grad)[1]
 
         # --- Finite difference ---
-        ε = 1e-6
+        ε = 1.0e-6
         function cost_at(θ)
             p = CUDA.CuVector{Float64}([θ])
             CuDensityMat.initialize_zero!(rho_out)
@@ -238,7 +238,7 @@
         end
         fd_grad = (cost_at(θ₀ + ε) - cost_at(θ₀ - ε)) / (2ε)
 
-        @test backward_grad ≈ fd_grad rtol = 1e-4
+        @test backward_grad ≈ fd_grad rtol = 1.0e-4
 
         CuDensityMat.unregister_callback!(cb_refs)
         close(ws)
@@ -287,7 +287,7 @@
         D = 2
         θ₀ = 1.5
         rho_in_data = T[0.7, -0.3im, 0.3im, 0.3]
-        rho_out_adj_data = T[1.0, 0.2+0.1im, 0.2-0.1im, 0.5]
+        rho_out_adj_data = T[1.0, 0.2 + 0.1im, 0.2 - 0.1im, 0.5]
 
         # States
         rho_in = DenseMixedState{T}(ws, (2,); batch_size = 1)
@@ -338,10 +338,10 @@
         backward_adj = Array(rho_in_adj.storage)
 
         # Finite-difference: perturb each real and imaginary component of rho_in
-        ε = 1e-7
+        ε = 1.0e-7
         fd_adj = zeros(T, D * D)
 
-        for idx = 1:(D*D)
+        for idx in 1:(D * D)
             for (δ_re, δ_im) in [(ε, 0.0), (0.0, ε)]
                 perturbed = copy(rho_in_data)
                 perturbed[idx] += complex(δ_re, δ_im)
@@ -392,9 +392,9 @@
         # The backward state_in_adj should be conjugated relative to the
         # Wirtinger derivative: state_in_adj = conj(∂c/∂rho_in*)
         # For a linear operator, state_in_adj = A^H * rho_out_adj
-        for idx = 1:(D*D)
-            @test real(backward_adj[idx]) ≈ real(fd_adj[idx]) atol = 1e-4
-            @test imag(backward_adj[idx]) ≈ imag(fd_adj[idx]) atol = 1e-4
+        for idx in 1:(D * D)
+            @test real(backward_adj[idx]) ≈ real(fd_adj[idx]) atol = 1.0e-4
+            @test imag(backward_adj[idx]) ≈ imag(fd_adj[idx]) atol = 1.0e-4
         end
 
         CuDensityMat.unregister_callback!(cb_refs)
@@ -480,7 +480,7 @@
         CuDensityMat.allocate_storage!(rho_in)
         CuDensityMat.allocate_storage!(rho_out)
 
-        rho_in_data = T[0.6, 0.1-0.2im, 0.1+0.2im, 0.4]
+        rho_in_data = T[0.6, 0.1 - 0.2im, 0.1 + 0.2im, 0.4]
         rho_out_adj_data = T[0.8, 0.3im, -0.3im, 0.2]
         copyto!(rho_in.storage, CUDA.CuVector{T}(rho_in_data))
 
@@ -530,7 +530,7 @@
         backward_grads = Array(params_grad)
 
         # Finite difference for each parameter
-        ε = 1e-6
+        ε = 1.0e-6
         function cost_at_params(θ_vals)
             p = CUDA.CuVector{Float64}(θ_vals)
             CuDensityMat.initialize_zero!(rho_out)
@@ -548,13 +548,13 @@
             return real(dot(rho_out_adj_data, out))
         end
 
-        for n = 1:num_params
+        for n in 1:num_params
             θ_plus = copy(θ)
             θ_plus[n] += ε
             θ_minus = copy(θ)
             θ_minus[n] -= ε
             fd = (cost_at_params(θ_plus) - cost_at_params(θ_minus)) / (2ε)
-            @test backward_grads[n] ≈ fd rtol = 1e-4
+            @test backward_grads[n] ≈ fd rtol = 1.0e-4
         end
 
         CuDensityMat.unregister_callback!(refs_z)
@@ -615,7 +615,7 @@
         CuDensityMat.allocate_storage!(rho_in)
         CuDensityMat.allocate_storage!(rho_out)
 
-        rho_in_data = T[0.8, 0.1+0.05im, 0.1-0.05im, 0.2]
+        rho_in_data = T[0.8, 0.1 + 0.05im, 0.1 - 0.05im, 0.2]
         rho_out_adj_data = T[1.0, 0.0, 0.0, 1.0]
         copyto!(rho_in.storage, CUDA.CuVector{T}(rho_in_data))
 
@@ -664,7 +664,7 @@
         backward_grad = Array(params_grad)[1]
 
         # Finite difference
-        ε = 1e-6
+        ε = 1.0e-6
         function cost_at(Ω)
             p = CUDA.CuVector{Float64}([Ω])
             CuDensityMat.initialize_zero!(rho_out)
@@ -683,7 +683,7 @@
         end
         fd_grad = (cost_at(Ω₀ + ε) - cost_at(Ω₀ - ε)) / (2ε)
 
-        @test backward_grad ≈ fd_grad rtol = 1e-4
+        @test backward_grad ≈ fd_grad rtol = 1.0e-4
 
         CuDensityMat.unregister_callback!(cb_refs)
         close(ws)

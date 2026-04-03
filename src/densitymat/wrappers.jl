@@ -33,7 +33,7 @@ end
 Destroy a CuDensityMat library context handle.
 """
 function destroy(handle::cudensitymatHandle_t)
-    cudensitymatDestroy(handle)
+    return cudensitymatDestroy(handle)
 end
 
 """
@@ -53,5 +53,5 @@ end
 Destroy a workspace descriptor.
 """
 function destroy_workspace(workspace::cudensitymatWorkspaceDescriptor_t)
-    cudensitymatDestroyWorkspace(workspace)
+    return cudensitymatDestroyWorkspace(workspace)
 end

@@ -20,13 +20,13 @@ export wrap_scalar_callback, wrap_tensor_callback
 # =============================================================================
 
 # Maps UInt(id) → (julia_function, refs...) to prevent GC
-const _callback_registry = Dict{UInt,Any}()
+const _callback_registry = Dict{UInt, Any}()
 const _callback_lock = ReentrantLock()
 # Monotonic counter for unique callback IDs
 const _callback_id_counter = Ref{UInt}(0)
 
 function _register_callback(f)
-    lock(_callback_lock) do
+    return lock(_callback_lock) do
         _callback_id_counter[] += 1
         id = _callback_id_counter[]
         _callback_registry[id] = f
@@ -35,13 +35,13 @@ function _register_callback(f)
 end
 
 function _unregister_callback(id::UInt)
-    lock(_callback_lock) do
+    return lock(_callback_lock) do
         delete!(_callback_registry, id)
     end
 end
 
 function _get_callback(id::UInt)
-    lock(_callback_lock) do
+    return lock(_callback_lock) do
         return _callback_registry[id]
     end
 end
@@ -79,15 +79,15 @@ end
 # =============================================================================
 
 function _cpu_scalar_callback_wrapper(
-    callback_ptr::Ptr{Cvoid},  # our callback ID disguised as a function pointer
-    time::Cdouble,
-    batch_size::Int64,
-    num_params::Int32,
-    params_ptr::Ptr{Cdouble},
-    data_type::cudaDataType_t,
-    storage_ptr::Ptr{Cvoid},
-    stream::CUstream,
-)::Int32
+        callback_ptr::Ptr{Cvoid},  # our callback ID disguised as a function pointer
+        time::Cdouble,
+        batch_size::Int64,
+        num_params::Int32,
+        params_ptr::Ptr{Cdouble},
+        data_type::cudaDataType_t,
+        storage_ptr::Ptr{Cvoid},
+        stream::CUstream,
+    )::Int32
     try
         id = UInt(callback_ptr)
         f = _get_callback(id)
@@ -106,7 +106,7 @@ function _cpu_scalar_callback_wrapper(
         f(time, params, storage)
         return Int32(0)
     catch e
-        @error "Scalar callback error" exception=(e, catch_backtrace())
+        @error "Scalar callback error" exception = (e, catch_backtrace())
         return Int32(-1)
     end
 end
@@ -115,7 +115,7 @@ end
 const _cpu_scalar_wrapper_ptr = Ref{Ptr{Cvoid}}(C_NULL)
 
 function _init_scalar_wrapper!()
-    _cpu_scalar_wrapper_ptr[] = @cfunction(
+    return _cpu_scalar_wrapper_ptr[] = @cfunction(
         _cpu_scalar_callback_wrapper,
         Int32,
         (
@@ -148,19 +148,19 @@ end
 # =============================================================================
 
 function _cpu_tensor_callback_wrapper(
-    callback_ptr::Ptr{Cvoid},
-    sparsity::cudensitymatElementaryOperatorSparsity_t,
-    num_modes::Int32,
-    mode_extents_ptr::Ptr{Int64},
-    diagonal_offsets_ptr::Ptr{Int32},
-    time::Cdouble,
-    batch_size::Int64,
-    num_params::Int32,
-    params_ptr::Ptr{Cdouble},
-    data_type::cudaDataType_t,
-    storage_ptr::Ptr{Cvoid},
-    stream::CUstream,
-)::Int32
+        callback_ptr::Ptr{Cvoid},
+        sparsity::cudensitymatElementaryOperatorSparsity_t,
+        num_modes::Int32,
+        mode_extents_ptr::Ptr{Int64},
+        diagonal_offsets_ptr::Ptr{Int32},
+        time::Cdouble,
+        batch_size::Int64,
+        num_params::Int32,
+        params_ptr::Ptr{Cdouble},
+        data_type::cudaDataType_t,
+        storage_ptr::Ptr{Cvoid},
+        stream::CUstream,
+    )::Int32
     try
         id = UInt(callback_ptr)
         f = _get_callback(id)
@@ -185,7 +185,7 @@ function _cpu_tensor_callback_wrapper(
         f(time, params, storage)
         return Int32(0)
     catch e
-        @error "Tensor callback error" exception=(e, catch_backtrace())
+        @error "Tensor callback error" exception = (e, catch_backtrace())
         return Int32(-1)
     end
 end
@@ -193,7 +193,7 @@ end
 const _cpu_tensor_wrapper_ptr = Ref{Ptr{Cvoid}}(C_NULL)
 
 function _init_tensor_wrapper!()
-    _cpu_tensor_wrapper_ptr[] = @cfunction(
+    return _cpu_tensor_wrapper_ptr[] = @cfunction(
         _cpu_tensor_callback_wrapper,
         Int32,
         (
@@ -226,16 +226,16 @@ end
 # =============================================================================
 
 function _cpu_scalar_gradient_callback_wrapper(
-    callback_ptr::Ptr{Cvoid},
-    time::Cdouble,
-    batch_size::Int64,
-    num_params::Int32,
-    params_ptr::Ptr{Cdouble},
-    data_type::cudaDataType_t,
-    scalar_grad_ptr::Ptr{Cvoid},
-    params_grad_ptr::Ptr{Cdouble},
-    stream::CUstream,
-)::Int32
+        callback_ptr::Ptr{Cvoid},
+        time::Cdouble,
+        batch_size::Int64,
+        num_params::Int32,
+        params_ptr::Ptr{Cdouble},
+        data_type::cudaDataType_t,
+        scalar_grad_ptr::Ptr{Cvoid},
+        params_grad_ptr::Ptr{Cdouble},
+        stream::CUstream,
+    )::Int32
     try
         id = UInt(callback_ptr)
         f = _get_callback(id)
@@ -254,7 +254,7 @@ function _cpu_scalar_gradient_callback_wrapper(
         f(time, params, scalar_grad, params_grad)
         return Int32(0)
     catch e
-        @error "Scalar gradient callback error" exception=(e, catch_backtrace())
+        @error "Scalar gradient callback error" exception = (e, catch_backtrace())
         return Int32(-1)
     end
 end
@@ -262,7 +262,7 @@ end
 const _cpu_scalar_gradient_wrapper_ptr = Ref{Ptr{Cvoid}}(C_NULL)
 
 function _init_scalar_gradient_wrapper!()
-    _cpu_scalar_gradient_wrapper_ptr[] = @cfunction(
+    return _cpu_scalar_gradient_wrapper_ptr[] = @cfunction(
         _cpu_scalar_gradient_callback_wrapper,
         Int32,
         (
@@ -284,20 +284,20 @@ end
 # =============================================================================
 
 function _cpu_tensor_gradient_callback_wrapper(
-    callback_ptr::Ptr{Cvoid},
-    sparsity::cudensitymatElementaryOperatorSparsity_t,
-    num_modes::Int32,
-    mode_extents_ptr::Ptr{Int64},
-    diagonal_offsets_ptr::Ptr{Int32},
-    time::Cdouble,
-    batch_size::Int64,
-    num_params::Int32,
-    params_ptr::Ptr{Cdouble},
-    data_type::cudaDataType_t,
-    tensor_grad_ptr::Ptr{Cvoid},
-    params_grad_ptr::Ptr{Cdouble},
-    stream::CUstream,
-)::Int32
+        callback_ptr::Ptr{Cvoid},
+        sparsity::cudensitymatElementaryOperatorSparsity_t,
+        num_modes::Int32,
+        mode_extents_ptr::Ptr{Int64},
+        diagonal_offsets_ptr::Ptr{Int32},
+        time::Cdouble,
+        batch_size::Int64,
+        num_params::Int32,
+        params_ptr::Ptr{Cdouble},
+        data_type::cudaDataType_t,
+        tensor_grad_ptr::Ptr{Cvoid},
+        params_grad_ptr::Ptr{Cdouble},
+        stream::CUstream,
+    )::Int32
     try
         id = UInt(callback_ptr)
         f = _get_callback(id)
@@ -320,7 +320,7 @@ function _cpu_tensor_gradient_callback_wrapper(
         f(time, params, tensor_grad, params_grad)
         return Int32(0)
     catch e
-        @error "Tensor gradient callback error" exception=(e, catch_backtrace())
+        @error "Tensor gradient callback error" exception = (e, catch_backtrace())
         return Int32(-1)
     end
 end
@@ -328,7 +328,7 @@ end
 const _cpu_tensor_gradient_wrapper_ptr = Ref{Ptr{Cvoid}}(C_NULL)
 
 function _init_tensor_gradient_wrapper!()
-    _cpu_tensor_gradient_wrapper_ptr[] = @cfunction(
+    return _cpu_tensor_gradient_wrapper_ptr[] = @cfunction(
         _cpu_tensor_gradient_callback_wrapper,
         Int32,
         (
@@ -357,7 +357,7 @@ function _init_callback_wrappers!()
     _init_scalar_wrapper!()
     _init_tensor_wrapper!()
     _init_scalar_gradient_wrapper!()
-    _init_tensor_gradient_wrapper!()
+    return _init_tensor_gradient_wrapper!()
 end
 
 # =============================================================================
@@ -394,7 +394,7 @@ end
 cb, gcb, refs = wrap_scalar_callback(my_coeff)
 ```
 """
-function wrap_scalar_callback(f::Function; gradient::Union{Nothing,Function} = nothing)
+function wrap_scalar_callback(f::Function; gradient::Union{Nothing, Function} = nothing)
     # Ensure wrappers are initialized
     if _cpu_scalar_wrapper_ptr[] == C_NULL
         _init_callback_wrappers!()
@@ -446,7 +446,7 @@ Wrap a Julia function as a tensor callback for time-dependent operator elements.
 - `gcb::cudensitymatWrappedTensorGradientCallback_t`
 - `refs` — opaque reference holder
 """
-function wrap_tensor_callback(f::Function; gradient::Union{Nothing,Function} = nothing)
+function wrap_tensor_callback(f::Function; gradient::Union{Nothing, Function} = nothing)
     if _cpu_tensor_wrapper_ptr[] == C_NULL
         _init_callback_wrappers!()
     end
@@ -490,7 +490,7 @@ function unregister_callback!(refs)
     if refs.id !== nothing
         _unregister_callback(refs.id)
     end
-    if refs.grad_id !== nothing
+    return if refs.grad_id !== nothing
         _unregister_callback(refs.grad_id)
     end
 end

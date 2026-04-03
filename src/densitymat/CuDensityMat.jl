@@ -62,7 +62,7 @@ include("spectrum.jl")
 
 # Per-context handle cache following CUDA.jl pattern
 const _handle_cache =
-    HandleCache{CUDA.CuContext,cudensitymatHandle_t}((_) -> create(), (_, h) -> destroy(h))
+    HandleCache{CUDA.CuContext, cudensitymatHandle_t}((_) -> create(), (_, h) -> destroy(h))
 
 """
     handle() -> cudensitymatHandle_t
@@ -82,7 +82,7 @@ Return a handle to the cache for reuse.
 """
 function release_handle(h::cudensitymatHandle_t)
     ctx = CUDA.context()
-    push!(_handle_cache, ctx, h)
+    return push!(_handle_cache, ctx, h)
 end
 
 function __init__()
@@ -111,7 +111,7 @@ function __init__()
     end
 
     # Initialize callback @cfunction wrappers
-    _init_callback_wrappers!()
+    return _init_callback_wrappers!()
 end
 
 end # module CuDensityMat

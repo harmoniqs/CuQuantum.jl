@@ -9,7 +9,7 @@ function _spectrum_supported()
     try
         ws = WorkStream()
         dims = [2]
-        data = CUDA.CuVector{ComplexF64}([1.0+0im, 0.0, 0.0, -1.0+0im])
+        data = CUDA.CuVector{ComplexF64}([1.0 + 0im, 0.0, 0.0, -1.0 + 0im])
         elem = CuDensityMat.create_elementary_operator(ws, [2], data)
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
@@ -41,7 +41,7 @@ const SPECTRUM_SUPPORTED = _spectrum_supported()
         dims = [2]
         T = ComplexF64
 
-        data = CUDA.CuVector{T}([1.0+0im, 0.0, 0.0, -1.0+0im])
+        data = CUDA.CuVector{T}([1.0 + 0im, 0.0, 0.0, -1.0 + 0im])
         elem = CuDensityMat.create_elementary_operator(ws, [2], data)
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
@@ -66,7 +66,7 @@ const SPECTRUM_SUPPORTED = _spectrum_supported()
         dims = [2]
         T = ComplexF64
 
-        data = CUDA.CuVector{T}([1.0+0im, 0.0, 0.0, -1.0+0im])
+        data = CUDA.CuVector{T}([1.0 + 0im, 0.0, 0.0, -1.0 + 0im])
         elem = CuDensityMat.create_elementary_operator(ws, [2], data)
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
@@ -101,7 +101,7 @@ const SPECTRUM_SUPPORTED = _spectrum_supported()
         T = ComplexF64
 
         # sigma_z = diag(1, -1), eigenvalues are +1 and -1
-        data = CUDA.CuVector{T}([1.0+0im, 0.0, 0.0, -1.0+0im])
+        data = CUDA.CuVector{T}([1.0 + 0im, 0.0, 0.0, -1.0 + 0im])
         elem = CuDensityMat.create_elementary_operator(ws, [2], data)
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
@@ -142,8 +142,8 @@ const SPECTRUM_SUPPORTED = _spectrum_supported()
 
         evals = Array(eigenvalues)
         # Largest eigenvalue of sigma_z should be +1
-        @test abs(evals[1] - 1.0) < 1e-6
-        @test tolerances[1] < 1e-6  # should converge well
+        @test abs(evals[1] - 1.0) < 1.0e-6
+        @test tolerances[1] < 1.0e-6  # should converge well
 
         CuDensityMat.destroy_operator_spectrum(spec)
         close(ws)
@@ -155,7 +155,7 @@ const SPECTRUM_SUPPORTED = _spectrum_supported()
         dims = [2]
         T = ComplexF64
 
-        data = CUDA.CuVector{T}([1.0+0im, 0.0, 0.0, -1.0+0im])
+        data = CUDA.CuVector{T}([1.0 + 0im, 0.0, 0.0, -1.0 + 0im])
         elem = CuDensityMat.create_elementary_operator(ws, [2], data)
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
@@ -189,7 +189,7 @@ const SPECTRUM_SUPPORTED = _spectrum_supported()
 
         evals = Array(eigenvalues)
         # Smallest eigenvalue of sigma_z should be -1
-        @test abs(evals[1] - (-1.0)) < 1e-6
+        @test abs(evals[1] - (-1.0)) < 1.0e-6
 
         CuDensityMat.destroy_operator_spectrum(spec)
         close(ws)

@@ -150,7 +150,7 @@ end
             original = Array(psi.storage)
             CuDensityMat.inplace_scale!(psi, T(2))
             scaled = Array(psi.storage)
-            @test scaled ≈ original .* T(2) rtol=1e-5
+            @test scaled ≈ original .* T(2) rtol = 1.0e-5
         end
         close(ws)
     end
@@ -166,8 +166,8 @@ end
         CuDensityMat.inplace_scale!(psi, factors)
         scaled = reshape(Array(psi.storage), shape)
 
-        for i = 1:2
-            @test scaled[:, i] ≈ orig_view[:, i] .* factors[i] rtol=1e-5
+        for i in 1:2
+            @test scaled[:, i] ≈ orig_view[:, i] .* factors[i] rtol = 1.0e-5
         end
         close(ws)
     end
@@ -183,7 +183,7 @@ end
                 # Manual: squared frobenius norm
                 arr = Array(psi.storage)
                 expected = real(dot(arr, arr))
-                @test n[1] ≈ expected rtol=1e-4
+                @test n[1] ≈ expected rtol = 1.0e-4
             end
         end
         close(ws)
@@ -196,10 +196,10 @@ end
         @test length(n) == 2
         shape, _ = CuDensityMat.local_info(psi)
         arr = reshape(Array(psi.storage), shape)
-        for i = 1:2
-            col = vec(arr[ntuple(_->:, length(shape)-1)..., i])
+        for i in 1:2
+            col = vec(arr[ntuple(_ -> :, length(shape) - 1)..., i])
             expected = real(dot(col, col))
-            @test n[i] ≈ expected rtol=1e-5
+            @test n[i] ≈ expected rtol = 1.0e-5
         end
         close(ws)
     end
@@ -212,7 +212,7 @@ end
             # For pure states, trace = <psi|psi>
             arr = Array(psi.storage)
             expected = dot(arr, arr)
-            @test t[1] ≈ expected rtol=1e-4
+            @test t[1] ≈ expected rtol = 1.0e-4
         end
         close(ws)
     end
@@ -226,7 +226,7 @@ end
         d = prod(rho.hilbert_space_dims)
         mat = reshape(arr[1:(d^2)], (d, d))
         expected = tr(mat)
-        @test t[1] ≈ expected rtol=1e-5
+        @test t[1] ≈ expected rtol = 1.0e-5
         close(ws)
     end
 
@@ -258,7 +258,7 @@ end
             CuDensityMat.inplace_accumulate!(psi1, psi2_clone, factor)
             result = Array(psi1.storage)
             expected = arr1 .+ factor .* arr2
-            @test result ≈ expected rtol=1e-4
+            @test result ≈ expected rtol = 1.0e-4
         end
         close(ws)
     end
@@ -280,7 +280,7 @@ end
             arr1 = Array(psi1.storage)
             arr2 = Array(psi2.storage)
             expected = dot(arr1, arr2)
-            @test ip[1] ≈ expected rtol=1e-4
+            @test ip[1] ≈ expected rtol = 1.0e-4
         end
         close(ws)
     end
@@ -303,11 +303,11 @@ end
         shape, _ = CuDensityMat.local_info(psi1)
         arr1 = reshape(Array(psi1.storage), shape)
         arr2 = reshape(Array(psi2.storage), shape)
-        for i = 1:2
-            col1 = vec(arr1[ntuple(_->:, length(shape)-1)..., i])
-            col2 = vec(arr2[ntuple(_->:, length(shape)-1)..., i])
+        for i in 1:2
+            col1 = vec(arr1[ntuple(_ -> :, length(shape) - 1)..., i])
+            col2 = vec(arr2[ntuple(_ -> :, length(shape) - 1)..., i])
             expected = dot(col1, col2)
-            @test ip[i] ≈ expected rtol=1e-5
+            @test ip[i] ≈ expected rtol = 1.0e-5
         end
         close(ws)
     end

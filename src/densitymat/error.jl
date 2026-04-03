@@ -16,7 +16,7 @@ Base.showerror(io::IO, err::CUDENSITYMATError) = print(
 )
 
 function description(err::CUDENSITYMATError)
-    if err.code == CUDENSITYMAT_STATUS_SUCCESS
+    return if err.code == CUDENSITYMAT_STATUS_SUCCESS
         "the operation completed successfully"
     elseif err.code == CUDENSITYMAT_STATUS_NOT_INITIALIZED
         "the library was not initialized"
@@ -79,7 +79,7 @@ end
     )
     res = retry_reclaim(f, retry_if)
 
-    if res != CUDENSITYMAT_STATUS_SUCCESS
+    return if res != CUDENSITYMAT_STATUS_SUCCESS
         throw_api_error(res)
     end
 end

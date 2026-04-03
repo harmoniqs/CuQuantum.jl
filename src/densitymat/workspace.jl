@@ -28,10 +28,10 @@ mutable struct WorkStream
     workspace::cudensitymatWorkspaceDescriptor_t
     stream::CUDA.CuStream
     device_id::Int
-    memory_limit::Union{Nothing,Int}
+    memory_limit::Union{Nothing, Int}
 
     # Workspace buffer (managed CuVector for scratch space)
-    workspace_buffer::Union{Nothing,CUDA.CuVector{UInt8}}
+    workspace_buffer::Union{Nothing, CUDA.CuVector{UInt8}}
     workspace_size::Int
 
     # Communicator state
@@ -41,10 +41,10 @@ mutable struct WorkStream
     _comm_ref::Any
 
     function WorkStream(;
-        stream::Union{Nothing,CUDA.CuStream} = nothing,
-        memory_limit::Union{Nothing,Int} = nothing,
-        device_id::Union{Nothing,Int} = nothing,
-    )
+            stream::Union{Nothing, CUDA.CuStream} = nothing,
+            memory_limit::Union{Nothing, Int} = nothing,
+            device_id::Union{Nothing, Int} = nothing,
+        )
         dev = if device_id !== nothing
             CUDA.device!(device_id)
             device_id
@@ -119,7 +119,7 @@ Check if the WorkStream is still valid (not yet closed/finalized).
 Base.isopen(ws::WorkStream) = ws.handle != C_NULL && ws.workspace != C_NULL
 
 function _check_valid(ws::WorkStream)
-    isopen(ws) || error("WorkStream has been closed or finalized")
+    return isopen(ws) || error("WorkStream has been closed or finalized")
 end
 
 # --- Communicator management ---
@@ -145,11 +145,11 @@ set_communicator!(ws, :mpi;
 ```
 """
 function set_communicator!(
-    ws::WorkStream,
-    provider::Symbol;
-    comm_ptr::Union{Nothing,Ptr{Cvoid},Integer} = nothing,
-    comm_size::Union{Nothing,Integer} = nothing,
-)
+        ws::WorkStream,
+        provider::Symbol;
+        comm_ptr::Union{Nothing, Ptr{Cvoid}, Integer} = nothing,
+        comm_size::Union{Nothing, Integer} = nothing,
+    )
     _check_valid(ws)
 
     if ws.comm_set
@@ -225,10 +225,10 @@ end
 Query the required workspace buffer size in bytes after a `prepare` call.
 """
 function workspace_query_size(
-    ws::WorkStream;
-    memspace::Symbol = :device,
-    kind::Symbol = :scratch,
-)
+        ws::WorkStream;
+        memspace::Symbol = :device,
+        kind::Symbol = :scratch,
+    )
     _check_valid(ws)
     ms = memspace == :device ? CUDENSITYMAT_MEMSPACE_DEVICE : CUDENSITYMAT_MEMSPACE_HOST
     wk = CUDENSITYMAT_WORKSPACE_SCRATCH  # only scratch is supported
@@ -243,11 +243,11 @@ end
 Allocate and attach a workspace buffer of the given size.
 """
 function workspace_allocate!(
-    ws::WorkStream,
-    size::Int;
-    memspace::Symbol = :device,
-    kind::Symbol = :scratch,
-)
+        ws::WorkStream,
+        size::Int;
+        memspace::Symbol = :device,
+        kind::Symbol = :scratch,
+    )
     _check_valid(ws)
     size <= 0 && return nothing
 

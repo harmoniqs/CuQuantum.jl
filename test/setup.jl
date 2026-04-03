@@ -15,15 +15,17 @@ end
 
 # Skip macro for GPU-requiring tests
 macro gpu_test(name, body)
-    esc(quote
-        @testset $name begin
-            if HAS_GPU
-                $body
-            else
-                @test_skip "No GPU available"
+    return esc(
+        quote
+            @testset $name begin
+                if HAS_GPU
+                    $body
+                else
+                    @test_skip "No GPU available"
+                end
             end
         end
-    end)
+    )
 end
 
 # Common test parameters

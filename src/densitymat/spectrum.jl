@@ -17,10 +17,10 @@ mutable struct OperatorSpectrum
     _operator_ref::Operator
 
     function OperatorSpectrum(
-        handle::cudensitymatOperatorSpectrum_t,
-        ws::WorkStream,
-        operator::Operator,
-    )
+            handle::cudensitymatOperatorSpectrum_t,
+            ws::WorkStream,
+            operator::Operator,
+        )
         obj = new(handle, ws, operator)
         finalizer(obj) do x
             if x.handle != C_NULL
@@ -35,7 +35,7 @@ end
 Base.isopen(s::OperatorSpectrum) = s.handle != C_NULL
 
 function destroy_operator_spectrum(s::OperatorSpectrum)
-    if s.handle != C_NULL
+    return if s.handle != C_NULL
         cudensitymatDestroyOperatorSpectrum(s.handle)
         s.handle = C_NULL
     end
@@ -57,11 +57,11 @@ Create an eigenspectrum solver for the given operator.
   - `CUDENSITYMAT_OPERATOR_SPECTRUM_SMALLEST_REAL` — smallest real part
 """
 function create_operator_spectrum(
-    ws::WorkStream,
-    operator::Operator;
-    is_hermitian::Bool = true,
-    spectrum_kind::cudensitymatOperatorSpectrumKind_t = CUDENSITYMAT_OPERATOR_SPECTRUM_LARGEST,
-)
+        ws::WorkStream,
+        operator::Operator;
+        is_hermitian::Bool = true,
+        spectrum_kind::cudensitymatOperatorSpectrumKind_t = CUDENSITYMAT_OPERATOR_SPECTRUM_LARGEST,
+    )
     _check_valid(ws)
     spec_ref = Ref{cudensitymatOperatorSpectrum_t}()
     cudensitymatCreateOperatorSpectrum(
@@ -87,11 +87,11 @@ Configure a spectrum solver parameter.
 - `value`: Int32 configuration value
 """
 function configure_spectrum!(
-    ws::WorkStream,
-    spectrum::OperatorSpectrum,
-    attribute::cudensitymatOperatorSpectrumConfig_t,
-    value::Integer,
-)
+        ws::WorkStream,
+        spectrum::OperatorSpectrum,
+        attribute::cudensitymatOperatorSpectrumConfig_t,
+        value::Integer,
+    )
     _check_valid(ws)
     val = Ref{Int32}(Int32(value))
     cudensitymatOperatorSpectrumConfigure(
@@ -115,13 +115,13 @@ Prepare eigenspectrum computation.
 - `state`: A template state (defines the Hilbert space structure)
 """
 function prepare_spectrum!(
-    ws::WorkStream,
-    spectrum::OperatorSpectrum,
-    max_eigenstates::Integer,
-    state::AbstractState;
-    compute_type::cudensitymatComputeType_t = CUDENSITYMAT_COMPUTE_64F,
-    workspace_limit::Union{Nothing,Integer} = nothing,
-)
+        ws::WorkStream,
+        spectrum::OperatorSpectrum,
+        max_eigenstates::Integer,
+        state::AbstractState;
+        compute_type::cudensitymatComputeType_t = CUDENSITYMAT_COMPUTE_64F,
+        workspace_limit::Union{Nothing, Integer} = nothing,
+    )
     _check_valid(ws)
     mem_limit = _get_workspace_limit(ws, workspace_limit)
     cudensitymatOperatorSpectrumPrepare(
@@ -158,16 +158,16 @@ Compute eigenvalues and eigenstates.
 - `tolerances`: Vector{Float64} of convergence tolerances for each eigenvalue
 """
 function compute_spectrum!(
-    ws::WorkStream,
-    spectrum::OperatorSpectrum,
-    num_eigenstates::Integer,
-    eigenstates::AbstractVector{<:AbstractState},
-    eigenvalues::CUDA.CuArray;
-    time::Real = 0.0,
-    batch_size::Integer = 1,
-    num_params::Integer = 0,
-    params::Union{Nothing,CUDA.CuVector{Float64}} = nothing,
-)
+        ws::WorkStream,
+        spectrum::OperatorSpectrum,
+        num_eigenstates::Integer,
+        eigenstates::AbstractVector{<:AbstractState},
+        eigenvalues::CUDA.CuArray;
+        time::Real = 0.0,
+        batch_size::Integer = 1,
+        num_params::Integer = 0,
+        params::Union{Nothing, CUDA.CuVector{Float64}} = nothing,
+    )
     _check_valid(ws)
     params_ptr = params === nothing ? CUDA.CU_NULL : pointer(params)
     state_handles = cudensitymatState_t[s.handle for s in eigenstates]

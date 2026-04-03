@@ -8,7 +8,7 @@ export DensePureState, DenseMixedState
 # --- Julia type → cudaDataType mapping ---
 
 function julia_to_cuda_dtype(::Type{T}) where {T}
-    if T === Float32
+    return if T === Float32
         CUDA.R_32F
     elseif T === Float64
         CUDA.R_64F
@@ -24,7 +24,7 @@ function julia_to_cuda_dtype(::Type{T}) where {T}
 end
 
 function real_eltype(::Type{T}) where {T}
-    if T === ComplexF32 || T === Float32
+    return if T === ComplexF32 || T === Float32
         Float32
     elseif T === ComplexF64 || T === Float64
         Float64
@@ -59,14 +59,14 @@ mutable struct DensePureState{T} <: AbstractState{T}
     hilbert_space_dims::Vector{Int64}
     batch_size::Int64
     handle::cudensitymatState_t
-    storage::Union{Nothing,CUDA.CuVector{T}}
+    storage::Union{Nothing, CUDA.CuVector{T}}
     _owns_storage::Bool
 
     function DensePureState{T}(
-        ws::WorkStream,
-        hilbert_space_dims;
-        batch_size::Integer = 1,
-    ) where {T}
+            ws::WorkStream,
+            hilbert_space_dims;
+            batch_size::Integer = 1,
+        ) where {T}
         _check_valid(ws)
         dims = Int64[d for d in hilbert_space_dims]
         state_ref = Ref{cudensitymatState_t}()
@@ -112,14 +112,14 @@ mutable struct DenseMixedState{T} <: AbstractState{T}
     hilbert_space_dims::Vector{Int64}
     batch_size::Int64
     handle::cudensitymatState_t
-    storage::Union{Nothing,CUDA.CuVector{T}}
+    storage::Union{Nothing, CUDA.CuVector{T}}
     _owns_storage::Bool
 
     function DenseMixedState{T}(
-        ws::WorkStream,
-        hilbert_space_dims;
-        batch_size::Integer = 1,
-    ) where {T}
+            ws::WorkStream,
+            hilbert_space_dims;
+            batch_size::Integer = 1,
+        ) where {T}
         _check_valid(ws)
         dims = Int64[d for d in hilbert_space_dims]
         state_ref = Ref{cudensitymatState_t}()
@@ -143,7 +143,7 @@ mutable struct DenseMixedState{T} <: AbstractState{T}
     end
 end
 
-const DenseState{T} = Union{DensePureState{T},DenseMixedState{T}}
+const DenseState{T} = Union{DensePureState{T}, DenseMixedState{T}}
 
 ispure(::DensePureState) = true
 ispure(::DenseMixedState) = false
@@ -152,7 +152,7 @@ Base.isopen(s::AbstractState) = s.handle != C_NULL
 
 function _check_state_valid(s::AbstractState)
     isopen(s) || error("State has been destroyed")
-    _check_valid(s.ws)
+    return _check_valid(s.ws)
 end
 
 # --- Component info queries ---
@@ -241,7 +241,7 @@ function local_info(state::DenseState{T}) where {T}
     # For batch_size=1, the API may not include a batch dimension,
     # so we add it for consistency with Python
     if state.batch_size == 1 &&
-       length(shape) == length(state.hilbert_space_dims) * (ispure(state) ? 1 : 2)
+            length(shape) == length(state.hilbert_space_dims) * (ispure(state) ? 1 : 2)
         shape = (shape..., 1)
         offs = (offs..., 0)
     end
@@ -263,7 +263,7 @@ function attach_storage!(state::DenseState{T}, data::CUDA.CuVector{T}) where {T}
     length(data) >= expected_size ||
         error("Buffer size $(length(data)) < required $(expected_size)")
     buf_ptrs = [pointer(data)]
-    buf_sizes = Csize_t[length(data)*sizeof(T)]
+    buf_sizes = Csize_t[length(data) * sizeof(T)]
     cudensitymatStateAttachComponentStorage(
         state.ws.handle,
         state.handle,
@@ -379,10 +379,10 @@ end
 Accumulate: `dest += factors * src`. Both states must be compatible.
 """
 function inplace_accumulate!(
-    dest::DenseState{T},
-    src::DenseState{T},
-    factors = one(T),
-) where {T}
+        dest::DenseState{T},
+        src::DenseState{T},
+        factors = one(T),
+    ) where {T}
     _check_state_compatibility(dest, src)
     factors_gpu = _prepare_factors(dest, factors)
     cudensitymatStateComputeAccumulation(
@@ -461,5 +461,5 @@ function _check_state_compatibility(a::AbstractState{T}, b::AbstractState{T}) wh
     typeof(a) == typeof(b) || error("State types must match: $(typeof(a)) vs $(typeof(b))")
     a.hilbert_space_dims == b.hilbert_space_dims || error("Hilbert space dims must match")
     a.batch_size == b.batch_size || error("Batch sizes must match")
-    a.ws === b.ws || error("WorkStreams must be the same object")
+    return a.ws === b.ws || error("WorkStreams must be the same object")
 end
