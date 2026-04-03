@@ -17,6 +17,7 @@ using CUDA: @checked, @gcsafe_ccall
 using CUDA: HandleCache
 
 using CEnum: @cenum
+import LinearAlgebra
 
 # JLL or local toolkit
 if CUDA.local_toolkit

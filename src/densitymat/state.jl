@@ -341,7 +341,7 @@ end
 
 Compute the squared Frobenius norm(s). Returns a CPU vector of length `batch_size`.
 """
-function norm(state::DenseState{T}) where {T}
+function LinearAlgebra.norm(state::DenseState{T}) where {T}
     _check_state_valid(state)
     RT = real_eltype(T)
     result = CUDA.zeros(RT, state.batch_size)
@@ -360,7 +360,7 @@ end
 
 Compute the trace(s). Returns a CPU vector of length `batch_size`.
 """
-function trace(state::DenseState{T}) where {T}
+function LinearAlgebra.tr(state::DenseMixedState{T}) where {T}
     _check_state_valid(state)
     result = CUDA.zeros(T, state.batch_size)
     cudensitymatStateComputeTrace(
@@ -401,7 +401,7 @@ end
 
 Compute inner product(s) ⟨left|right⟩. Returns a CPU vector of length `batch_size`.
 """
-function inner_product(left::DenseState{T}, right::DenseState{T}) where {T}
+function LinearAlgebra.dot(left::DenseState{T}, right::DenseState{T}) where {T}
     _check_state_compatibility(left, right)
     result = CUDA.zeros(T, left.batch_size)
     cudensitymatStateComputeInnerProduct(
@@ -414,6 +414,11 @@ function inner_product(left::DenseState{T}, right::DenseState{T}) where {T}
     CUDA.synchronize()
     return Array(result)
 end
+
+# Backward-compatible aliases — prefer the LinearAlgebra extensions above.
+const norm = LinearAlgebra.norm
+const trace = LinearAlgebra.tr
+const inner_product = LinearAlgebra.dot
 
 # --- Clone ---
 
