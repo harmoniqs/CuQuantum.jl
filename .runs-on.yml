@@ -1,0 +1,33 @@
+# runs-on configuration for CuQuantum.jl
+# https://runs-on.com/docs/configuration/
+#
+# Defines a named runner profile ("gpu") used by the gpu-test CI job.
+# The profile targets a g4dn.xlarge instance (NVIDIA T4 GPU, 4 vCPU, 16 GB RAM)
+# with the ubuntu22-gpu-x64 image, which is pre-configured with the NVIDIA
+# driver and CUDA toolkit — no driver installation needed in the workflow.
+#
+# Instance choice rationale:
+#   - g4dn.xlarge: cheapest NVIDIA GPU instance on AWS (~$0.15–0.53/hr spot)
+#   - T4 (Turing, compute capability 7.5): fully supported by CUDA.jl
+#   - 16 GB RAM: sufficient for the CuQuantum.jl test suite
+#
+# Spot is enabled with the price-capacity-optimized strategy for cost savings,
+# with automatic on-demand fallback built into runs-on.
+#
+# The timeout is set to 45 minutes; runs-on will terminate the instance if the
+# job exceeds this limit (guards against hung GPU jobs burning credits).
+#
+# After installing runs-on in the harmoniqs AWS account, verify the runner
+# labels below match what the runs-on dashboard reports for your stack.
+
+runners:
+  gpu:
+    # g4dn.xlarge: NVIDIA T4, 4 vCPU, 16 GB RAM
+    family: g4dn.xlarge
+    # ubuntu22-gpu-x64 is a runs-on managed image with NVIDIA drivers + CUDA
+    # toolkit pre-installed on Ubuntu 22.04 LTS (x86-64).
+    # See: https://runs-on.com/runners/gpu/
+    image: ubuntu22-gpu-x64
+    spot: true
+    # Job-level timeout in minutes; complementary to the workflow-level timeout
+    timeout: 45
