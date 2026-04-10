@@ -1,48 +1,28 @@
-name: CI
+name: GPU Benchmark
 on:
-  pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - '*.md'
-  push:
-    branches:
-      - main
-    tags: ['*']
+  workflow_dispatch:
+    inputs:
+      instance-type:
+        description: 'EC2 instance type'
+        required: true
+        type: choice
+        options:
+          - g4dn.xlarge    # NVIDIA T4
+          - g5.xlarge      # NVIDIA A10G
+          - p4d.24xlarge   # 8x NVIDIA A100
+          - p5.48xlarge    # 8x NVIDIA H100
+      benchmark-script:
+        description: 'Julia benchmark script to run'
+        required: false
+        default: 'benchmark/run_benchmarks.jl'
+        type: string
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+  group: gpu-benchmark
+  cancel-in-progress: false
 jobs:
-  build:
-    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ github.event_name }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        version:
-          - '1.12'
-          - '1.10'
-          - '1.11'
-        os:
-          - ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: julia-actions/setup-julia@v2
-        with:
-          version: ${{ matrix.version }}
-      - uses: julia-actions/cache@v3
-      - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
-        # GPU-requiring tests are skipped automatically via @gpu_test / @test_skip.
-        # This runs module-loading tests and verifies the test infrastructure itself.
-        # Full GPU test suite is run on GPU-enabled runners (see gpu-test job below).
-
   start-gpu-runner:
     name: Start GPU Runner
     runs-on: ubuntu-latest
-    if: >-
-      github.event.pull_request.head.repo.full_name == github.repository
-      || (github.event_name == 'push'
-          && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')))
     permissions:
       id-token: write
       contents: read
@@ -63,38 +43,47 @@ jobs:
           mode: start
           github-token: ${{ secrets.GH_RUNNER_PAT }}
           ec2-image-id: ${{ secrets.AWS_GPU_RUNNER_AMI_ID }}
-          ec2-instance-type: g4dn.xlarge
+          ec2-instance-type: ${{ inputs.instance-type }}
           subnet-id: ${{ secrets.AWS_GPU_RUNNER_SUBNET_ID }}
           security-group-id: ${{ secrets.AWS_GPU_RUNNER_SG_ID }}
           iam-role-name: ${{ secrets.AWS_GPU_RUNNER_INSTANCE_PROFILE }}
-          market-type: spot
+          market-type: ${{ startsWith(inputs.instance-type, 'p') && 'on-demand' || 'spot' }}
           aws-resource-tags: >-
             [{"Key": "gpu-runner", "Value": "true"},
-             {"Key": "Project", "Value": "CuQuantum.jl"}]
+             {"Key": "Project", "Value": "CuQuantum.jl"},
+             {"Key": "Purpose", "Value": "benchmark"}]
           pre-runner-script: |
             curl -fsSL https://install.julialang.org | sh -s -- --yes --default-channel 1.12
             export PATH="$HOME/.juliaup/bin:$PATH"
 
-  gpu-test:
-    name: GPU Tests
+  benchmark:
+    name: Run Benchmarks
     needs: start-gpu-runner
     runs-on: ${{ needs.start-gpu-runner.outputs.label }}
     env:
       JULIA_CUDA_MEMORY_POOL: none
-      CUDA_VISIBLE_DEVICES: '0'
-    timeout-minutes: 45
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1.12'
       - uses: julia-actions/cache@v3
-      - uses: julia-actions/julia-buildpkg@v1
-      - uses: julia-actions/julia-runtest@v1
+      - name: Install dependencies
+        run: julia --project=benchmark -e 'using Pkg; Pkg.instantiate()'
+      - name: Run benchmarks
+        env:
+          BENCHMARK_SCRIPT: ${{ inputs.benchmark-script }}
+        run: julia --project=benchmark "$BENCHMARK_SCRIPT"
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ inputs.instance-type }}-${{ github.run_number }}
+          path: benchmark/results/
 
   stop-gpu-runner:
     name: Stop GPU Runner
-    needs: [start-gpu-runner, gpu-test]
+    needs: [start-gpu-runner, benchmark]
     runs-on: ubuntu-latest
     if: always()
     permissions:
