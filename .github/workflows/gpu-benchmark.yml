@@ -42,9 +42,7 @@ jobs:
         with:
           mode: start
           github-token: ${{ secrets.GH_RUNNER_PAT }}
-          ec2-image-id: ${{ secrets.AWS_GPU_RUNNER_AMI_ID }}
           ec2-instance-type: ${{ inputs.instance-type }}
-          security-group-id: ${{ secrets.AWS_GPU_RUNNER_SG_ID }}
           iam-role-name: ${{ secrets.AWS_GPU_RUNNER_INSTANCE_PROFILE }}
           market-type: ${{ startsWith(inputs.instance-type, 'p') && 'on-demand' || 'spot' }}
           availability-zones-config: ${{ secrets.AWS_GPU_RUNNER_AZ_CONFIG }}
