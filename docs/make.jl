@@ -21,6 +21,7 @@ makedocs(;
         ],
         "API Reference" => ["CuDensityMat" => "api/cudensitymat.md"],
         "Benchmarks" => "benchmarks.md",
+        "CI & Benchmarks" => "ci.md",
     ],
 )
 
