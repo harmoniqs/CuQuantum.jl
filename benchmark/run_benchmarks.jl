@@ -548,7 +548,9 @@ function main()
     end
 
     # Save CSV
-    csv_file = joinpath(@__DIR__, "..", "benchmark_results.csv")
+    results_dir = joinpath(@__DIR__, "results")
+    mkpath(results_dir)
+    csv_file = joinpath(results_dir, "benchmark_results.csv")
     open(csv_file, "w") do io
         println(io, "M,D,rho_elements,gpu_ms,cpu_dense_ms,cpu_sparse_ms")
         for r in results
@@ -558,7 +560,7 @@ function main()
             )
         end
     end
-    println("Results saved to benchmark_results.csv")
+    println("Results saved to $csv_file")
 end
 
 main()
