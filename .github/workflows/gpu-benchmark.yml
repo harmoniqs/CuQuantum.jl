@@ -23,6 +23,8 @@ jobs:
   start-gpu-runner:
     name: Start GPU Runner
     runs-on: ubuntu-latest
+    # Gate benchmark runs behind maintainer approval when triggered by non-maintainers.
+    environment: ${{ github.actor != 'jack-champagne' && 'gpu-ci' || '' }}
     permissions:
       id-token: write
       contents: read

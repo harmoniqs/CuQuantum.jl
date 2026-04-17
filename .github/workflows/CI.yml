@@ -43,6 +43,9 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository
       || (github.event_name == 'push'
           && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')))
+    # Gate GPU runs behind maintainer approval for non-maintainer PRs (incl. Dependabot).
+    # Pushes to main/tags and PRs from maintainers bypass the gate.
+    environment: ${{ (github.event_name == 'pull_request' && github.event.pull_request.user.login != 'jack-champagne') && 'gpu-ci' || '' }}
     permissions:
       id-token: write
       contents: read
