@@ -19,6 +19,7 @@ using CuQuantum
 using CuQuantum.CuDensityMat
 using CUDA.CUSPARSE
 using LinearAlgebra
+using QuantumToolbox
 using SparseArrays
 using Statistics
 
@@ -342,92 +343,64 @@ function benchmark_cpu_dense(M::Int, d::Int; n_warmup = 3, n_trials = 20)
 end
 
 # =============================================================================
-# 3. CPU sparse baseline: sparse superoperator
+# 3. QuantumToolbox.jl path: sparse Liouvillian via QT.jl, CPU + GPU cuSPARSE
 # =============================================================================
+#
+# Routed through QuantumToolbox.jl's `liouvillian` + `QuantumObject` so the
+# tracked series includes QT.jl dispatch/allocation overhead — regressions in
+# the user-facing QT.jl path show up here.
 
 """
-Build a sparse Liouvillian superoperator directly using Kronecker products
-of sparse matrices. Avoids forming the dense superoperator.
+Build the Lindblad system as QuantumToolbox.jl `QuantumObject`s. Returns the
+Liouvillian super-operator and the vectorized initial density matrix.
 """
-function build_cpu_sparse_system(M::Int, d::Int)
-    T = ComplexF64
-    D = d^M
+function build_qt_system(M::Int, d::Int)
+    a = destroy(d)
+    Id = qeye(d)
 
-    # Single-cavity operators (sparse)
-    a_single = spzeros(T, d, d)
-    for n = 1:(d-1)
-        a_single[n, n+1] = sqrt(n)
-    end
-    n_single = a_single' * a_single
-    kerr_single = n_single * (n_single - sparse(T(1)*I, d, d))
-
-    # Embed into full Hilbert space using sparse Kronecker products
-    function embed_sparse(op, mode, M, d)
-        mats = [i == mode ? op : sparse(T(1)*I, d, d) for i = 1:M]
-        result = mats[1]
-        for i = 2:M
-            result = kron(result, mats[i])
-        end
-        return result
-    end
+    a_ops = [tensor([i == m ? a : Id for i = 1:M]...) for m = 1:M]
+    n_ops = [adjoint(ao) * ao for ao in a_ops]
 
     χ = 2π * 0.2
     κ₀ = 2π * 0.1
     γ = 0.01
 
-    eye_D = sparse(T(1)*I, D, D)
-
-    # Build Hamiltonian (sparse D×D)
-    H = spzeros(T, D, D)
-    a_ops = [embed_sparse(a_single, m, M, d) for m = 1:M]
-    n_ops = [embed_sparse(n_single, m, M, d) for m = 1:M]
-    for m = 1:M
-        H += χ * embed_sparse(kerr_single, m, M, d)
-    end
+    Id_full = tensor(fill(Id, M)...)
+    H = sum(χ * nm * (nm - Id_full) for nm in n_ops)
     for n = 1:M, m = 1:M
         n == m && continue
-        H += κ₀ * (a_ops[n]' * a_ops[m])
+        H += κ₀ * (adjoint(a_ops[n]) * a_ops[m])
     end
 
-    # Build sparse Liouvillian superoperator (D²×D²)
-    # L = -i(I⊗H - Hᵀ⊗I) + γ Σ_m (conj(a_m)⊗a_m - ½ I⊗n_m - ½ n_mᵀ⊗I)
-    L_super = -im * (kron(eye_D, H) - kron(transpose(H), eye_D))
-    for m = 1:M
-        am = a_ops[m]
-        nm = n_ops[m]
-        L_super +=
-            γ * (kron(conj(am), am) - 0.5*kron(eye_D, nm) - 0.5*kron(transpose(nm), eye_D))
-    end
+    c_ops = [sqrt(γ) * ao for ao in a_ops]
+    L = liouvillian(H, c_ops)
 
-    # Initial state
-    rho_vec = zeros(T, D*D)
-    rho_vec[2+D*(2-1)] = 1.0
+    # Initial state: |1,0,...,0⟩⟨1,0,...,0|
+    ψ = tensor(fock(d, 1), [fock(d, 0) for _ = 2:M]...)
+    ρ_vec = mat2vec(ket2dm(ψ))
 
-    return L_super, rho_vec
+    return L, ρ_vec
 end
 
 function benchmark_cpu_sparse(M::Int, d::Int; n_warmup = 3, n_trials = 20)
     D = d^M
-    # Sparse superoperator is D²×D² but with O(M * d² * D²) non-zeros.
-    # For D=729 (M=6): ~531K² matrix, ~50M non-zeros → ~1.2 GB storage. Feasible.
-    # For D=6561 (M=8): ~43M² matrix, ~5B non-zeros → ~120 GB storage. Too large.
+    # Sparse superoperator is D²×D² with O(M·d²·D²) non-zeros.
+    # D=729 (M=6): ~50M nnz ≈ 1.2 GB — feasible. D=6561 (M=8): ~5B nnz — too large.
     if D > 1000
         return NaN, NaN, NaN
     end
 
-    L_sparse, rho_vec = build_cpu_sparse_system(M, d)
-    rho_dot = similar(rho_vec)
+    L, ρ_vec = build_qt_system(M, d)
 
-    # Warmup
+    # Warmup (QObject `*` returns a new QObject — captures allocation overhead)
     for _ = 1:n_warmup
-        mul!(rho_dot, L_sparse, rho_vec)
+        L * ρ_vec
     end
 
-    # Timed runs
     times = Float64[]
     for _ = 1:n_trials
         t0 = time_ns()
-        mul!(rho_dot, L_sparse, rho_vec)
+        L * ρ_vec
         t1 = time_ns()
         push!(times, (t1 - t0) / 1e6)
     end
@@ -435,34 +408,27 @@ function benchmark_cpu_sparse(M::Int, d::Int; n_warmup = 3, n_trials = 20)
     return median(times), minimum(times), maximum(times)
 end
 
-# =============================================================================
-# 4. GPU cuSPARSE SpMV benchmark (same sparse Liouvillian, on-device)
-# =============================================================================
-
 function benchmark_cusparse_gpu(M::Int, d::Int; n_warmup = 5, n_trials = 50)
     D = d^M
-    # Same memory envelope as the CPU sparse path — the CPU build has to fit first.
     if D > 1000
         return NaN, NaN, NaN
     end
 
-    L_cpu, rho_vec_cpu = build_cpu_sparse_system(M, d)
-    L_gpu = CUSPARSE.CuSparseMatrixCSC(L_cpu)
-    rho_vec = CUDA.CuVector{ComplexF64}(rho_vec_cpu)
-    rho_dot = similar(rho_vec)
+    L_cpu, ρ_vec_cpu = build_qt_system(M, d)
+    L_gpu = cu(L_cpu)          # QObject wrapping CuSparseMatrixCSC
+    ρ_vec_gpu = cu(ρ_vec_cpu)  # QObject wrapping CuVector
 
     # Warmup
     for _ = 1:n_warmup
-        mul!(rho_dot, L_gpu, rho_vec)
+        L_gpu * ρ_vec_gpu
     end
     CUDA.synchronize()
 
-    # Timed runs
     times = Float64[]
     for _ = 1:n_trials
         CUDA.synchronize()
         t0 = time_ns()
-        mul!(rho_dot, L_gpu, rho_vec)
+        L_gpu * ρ_vec_gpu
         CUDA.synchronize()
         t1 = time_ns()
         push!(times, (t1 - t0) / 1e6)
@@ -627,9 +593,9 @@ function main()
         for r in results
             for (label, value) in (
                 ("cuDensityMat GPU L[ρ] M=$(r.M) D=$(r.D)", r.gpu_ms),
-                ("GPU cuSPARSE SpMV L[ρ] M=$(r.M) D=$(r.D)", r.gpu_cusparse_ms),
+                ("QT.jl GPU cuSPARSE L[ρ] M=$(r.M) D=$(r.D)", r.gpu_cusparse_ms),
                 ("CPU dense SpMV L[ρ] M=$(r.M) D=$(r.D)", r.cpu_dense_ms),
-                ("CPU sparse SpMV L[ρ] M=$(r.M) D=$(r.D)", r.cpu_sparse_ms),
+                ("QT.jl CPU sparse L[ρ] M=$(r.M) D=$(r.D)", r.cpu_sparse_ms),
             )
                 isnan(value) && continue
                 first || print(io, ",")
