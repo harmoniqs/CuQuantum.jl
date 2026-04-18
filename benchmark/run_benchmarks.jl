@@ -17,6 +17,7 @@
 using CUDA
 using CuQuantum
 using CuQuantum.CuDensityMat
+using CUDA.CUSPARSE
 using LinearAlgebra
 using SparseArrays
 using Statistics
@@ -435,7 +436,43 @@ function benchmark_cpu_sparse(M::Int, d::Int; n_warmup = 3, n_trials = 20)
 end
 
 # =============================================================================
-# 4. Run all benchmarks
+# 4. GPU cuSPARSE SpMV benchmark (same sparse Liouvillian, on-device)
+# =============================================================================
+
+function benchmark_cusparse_gpu(M::Int, d::Int; n_warmup = 5, n_trials = 50)
+    D = d^M
+    # Same memory envelope as the CPU sparse path — the CPU build has to fit first.
+    if D > 1000
+        return NaN, NaN, NaN
+    end
+
+    L_cpu, rho_vec_cpu = build_cpu_sparse_system(M, d)
+    L_gpu = CUSPARSE.CuSparseMatrixCSC(L_cpu)
+    rho_vec = CUDA.CuVector{ComplexF64}(rho_vec_cpu)
+    rho_dot = similar(rho_vec)
+
+    # Warmup
+    for _ = 1:n_warmup
+        mul!(rho_dot, L_gpu, rho_vec)
+    end
+    CUDA.synchronize()
+
+    # Timed runs
+    times = Float64[]
+    for _ = 1:n_trials
+        CUDA.synchronize()
+        t0 = time_ns()
+        mul!(rho_dot, L_gpu, rho_vec)
+        CUDA.synchronize()
+        t1 = time_ns()
+        push!(times, (t1 - t0) / 1e6)
+    end
+
+    return median(times), minimum(times), maximum(times)
+end
+
+# =============================================================================
+# 5. Run all benchmarks
 # =============================================================================
 
 function main()
@@ -526,12 +563,31 @@ function main()
             println("SKIPPED (D=$D too large)")
         end
 
+        # GPU cuSPARSE SpMV
+        print("  GPU cuSPARSE SpMV:  ")
+        gpu_cusparse_med, gpu_cusparse_min, gpu_cusparse_max = try
+            benchmark_cusparse_gpu(M, d)
+        catch e
+            println("FAILED: $e")
+            (NaN, NaN, NaN)
+        end
+        if !isnan(gpu_cusparse_med)
+            println(
+                "$(round(gpu_cusparse_med, digits=3)) ms (min=$(round(gpu_cusparse_min, digits=3)), max=$(round(gpu_cusparse_max, digits=3)))",
+            )
+        elseif gpu_cusparse_med === NaN
+            println("SKIPPED (D=$D too large)")
+        end
+
         # Speedup
         if !isnan(gpu_med) && !isnan(cpu_sparse_med)
-            println("  Speedup (sparse/GPU): $(round(cpu_sparse_med / gpu_med, digits=1))x")
+            println("  Speedup (sparse/GPU cuDensityMat): $(round(cpu_sparse_med / gpu_med, digits=1))x")
         end
         if !isnan(gpu_med) && !isnan(cpu_dense_med)
-            println("  Speedup (dense/GPU):  $(round(cpu_dense_med / gpu_med, digits=1))x")
+            println("  Speedup (dense/GPU cuDensityMat):  $(round(cpu_dense_med / gpu_med, digits=1))x")
+        end
+        if !isnan(gpu_cusparse_med) && !isnan(gpu_med)
+            println("  Speedup (cuSPARSE/cuDensityMat):   $(round(gpu_cusparse_med / gpu_med, digits=1))x")
         end
 
         push!(
@@ -542,6 +598,7 @@ function main()
                 gpu_ms = gpu_med,
                 cpu_dense_ms = cpu_dense_med,
                 cpu_sparse_ms = cpu_sparse_med,
+                gpu_cusparse_ms = gpu_cusparse_med,
             ),
         )
         println()
@@ -552,11 +609,11 @@ function main()
     mkpath(results_dir)
     csv_file = joinpath(results_dir, "benchmark_results.csv")
     open(csv_file, "w") do io
-        println(io, "M,D,rho_elements,gpu_ms,cpu_dense_ms,cpu_sparse_ms")
+        println(io, "M,D,rho_elements,gpu_ms,cpu_dense_ms,cpu_sparse_ms,gpu_cusparse_ms")
         for r in results
             println(
                 io,
-                "$(r.M),$(r.D),$(r.D^2),$(r.gpu_ms),$(r.cpu_dense_ms),$(r.cpu_sparse_ms)",
+                "$(r.M),$(r.D),$(r.D^2),$(r.gpu_ms),$(r.cpu_dense_ms),$(r.cpu_sparse_ms),$(r.gpu_cusparse_ms)",
             )
         end
     end
@@ -570,6 +627,7 @@ function main()
         for r in results
             for (label, value) in (
                 ("cuDensityMat GPU L[ρ] M=$(r.M) D=$(r.D)", r.gpu_ms),
+                ("GPU cuSPARSE SpMV L[ρ] M=$(r.M) D=$(r.D)", r.gpu_cusparse_ms),
                 ("CPU dense SpMV L[ρ] M=$(r.M) D=$(r.D)", r.cpu_dense_ms),
                 ("CPU sparse SpMV L[ρ] M=$(r.M) D=$(r.D)", r.cpu_sparse_ms),
             )
