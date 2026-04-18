@@ -16,10 +16,12 @@ using CUDA: CuPtr, PtrOrCuPtr, unsafe_free!, HandleCache
     using CUDA.CUDACore: CUstream, cudaDataType, libraryPropertyType
     using CUDA.CUDACore: retry_reclaim, initialize_context
     using CUDA.CUDACore: @checked, @gcsafe_ccall
+    using CUDA.CUDACore: R_32F, R_64F, C_32F, C_64F
 else
     using CUDA: CUstream, cudaDataType, libraryPropertyType
     using CUDA: retry_reclaim, initialize_context
     using CUDA: @checked, @gcsafe_ccall
+    using CUDA: R_32F, R_64F, C_32F, C_64F
 end
 
 using CEnum: @cenum

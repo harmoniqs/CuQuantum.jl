@@ -51,13 +51,13 @@ end
 # =============================================================================
 
 function _cuda_dtype_to_julia(dt::cudaDataType_t)
-    if dt == CUDA.R_32F
+    if dt == R_32F
         return Float32
-    elseif dt == CUDA.R_64F
+    elseif dt == R_64F
         return Float64
-    elseif dt == CUDA.C_32F
+    elseif dt == C_32F
         return ComplexF32
-    elseif dt == CUDA.C_64F
+    elseif dt == C_64F
         return ComplexF64
     else
         error("Unsupported CUDA data type: $dt")

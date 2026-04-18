@@ -9,13 +9,13 @@ export DensePureState, DenseMixedState
 
 function julia_to_cuda_dtype(::Type{T}) where {T}
     if T === Float32
-        CUDA.R_32F
+        R_32F
     elseif T === Float64
-        CUDA.R_64F
+        R_64F
     elseif T === ComplexF32
-        CUDA.C_32F
+        C_32F
     elseif T === ComplexF64
-        CUDA.C_64F
+        C_64F
     else
         error(
             "Unsupported data type: $T. Supported: Float32, Float64, ComplexF32, ComplexF64",
