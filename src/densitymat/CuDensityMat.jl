@@ -10,16 +10,27 @@ Part of the CuQuantum.jl package.
 module CuDensityMat
 
 using CUDA
-using CUDA: CUstream, cudaDataType, libraryPropertyType
-using CUDA: CuPtr, PtrOrCuPtr
-using CUDA: unsafe_free!, retry_reclaim, initialize_context
-using CUDA: @checked, @gcsafe_ccall
-using CUDA: HandleCache
+using CUDA: CuPtr, PtrOrCuPtr, unsafe_free!, HandleCache
+# CUDA 6 moved low-level symbols into CUDA.CUDACore; CUDA 5 keeps them top-level.
+@static if isdefined(CUDA, :CUDACore)
+    using CUDA.CUDACore: CUstream, cudaDataType, libraryPropertyType
+    using CUDA.CUDACore: retry_reclaim, initialize_context
+    using CUDA.CUDACore: @checked, @gcsafe_ccall
+else
+    using CUDA: CUstream, cudaDataType, libraryPropertyType
+    using CUDA: retry_reclaim, initialize_context
+    using CUDA: @checked, @gcsafe_ccall
+end
 
 using CEnum: @cenum
 
 # JLL or local toolkit
-if CUDA.local_toolkit
+@static if isdefined(CUDA, :CUDACore)
+    const _local_toolkit = CUDA.CUDACore.local_toolkit
+else
+    const _local_toolkit = CUDA.local_toolkit
+end
+if _local_toolkit
     using CUDA_Runtime_Discovery
 else
     import cuQuantum_jll
