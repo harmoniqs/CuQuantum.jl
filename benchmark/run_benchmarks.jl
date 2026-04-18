@@ -1,26 +1,29 @@
 # =============================================================================
-# Benchmark: cuDensityMat (GPU) vs QuantumToolbox.jl (CPU)
+# Benchmark: Liouvillian action L[ρ] — cuDensityMat vs QuantumToolbox.jl
 # =============================================================================
 #
-# Compares the time to evaluate a single Liouvillian action L[ρ] for the
-# dual-rail cavity system at varying numbers of cavities M.
+# Times a single L[ρ] evaluation for the dual-rail cavity system across:
+#   - cuDensityMat (GPU, direct library binding)
+#   - QT.jl GPU cuSPARSE (sparse Liouvillian on-device via QuantumObject)
+#   - QT.jl CPU sparse
+#   - CPU dense (small sizes only)
 #
 # System: M coupled cavities, Fock truncation d=3
-#   H(t) = Σ_m χ n_m(n_m-1) + Σ_m δ_m(t) n_m + Σ_{n≠m} κ(t) a_n†a_m
+#   H = Σ_m χ n_m(n_m-1) + Σ_{n≠m} κ a_n†a_m
 #   L[ρ] = -i[H,ρ] + γ Σ_m (a_m ρ a_m† - ½{n_m, ρ})
 #
 # Usage:
 #   julia --project=. benchmark/run_benchmarks.jl
 #
-# Output: benchmark_results.csv
+# Outputs (written to benchmark/results/):
+#   benchmark_results.csv — raw per-backend median/min/max
+#   bench.json            — customSmallerIsBetter format for github-action-benchmark
 
 using CUDA
 using CuQuantum
 using CuQuantum.CuDensityMat
-using CUDA.CUSPARSE
 using LinearAlgebra
 using QuantumToolbox
-using SparseArrays
 using Statistics
 
 # =============================================================================
@@ -438,7 +441,7 @@ function benchmark_cusparse_gpu(M::Int, d::Int; n_warmup = 5, n_trials = 50)
 end
 
 # =============================================================================
-# 5. Run all benchmarks
+# 4. Run all benchmarks
 # =============================================================================
 
 function main()
