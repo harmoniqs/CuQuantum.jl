@@ -103,7 +103,7 @@ function __init__()
 
     # Find the library
     global libcudensitymat
-    if CUDA.local_toolkit
+    if _local_toolkit
         local dirs = CUDA_Runtime_Discovery.find_toolkit()
         local path =
             CUDA_Runtime_Discovery.get_library(dirs, "cudensitymat"; optional = true)
