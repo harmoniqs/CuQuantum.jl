@@ -561,6 +561,27 @@ function main()
         end
     end
     println("Results saved to $csv_file")
+
+    # Emit customSmallerIsBetter JSON for github-action-benchmark
+    json_file = joinpath(results_dir, "bench.json")
+    open(json_file, "w") do io
+        print(io, "[")
+        first = true
+        for r in results
+            for (label, value) in (
+                ("cuDensityMat GPU L[ρ] M=$(r.M) D=$(r.D)", r.gpu_ms),
+                ("CPU dense SpMV L[ρ] M=$(r.M) D=$(r.D)", r.cpu_dense_ms),
+                ("CPU sparse SpMV L[ρ] M=$(r.M) D=$(r.D)", r.cpu_sparse_ms),
+            )
+                isnan(value) && continue
+                first || print(io, ",")
+                first = false
+                print(io, "{\"name\":\"", label, "\",\"unit\":\"ms\",\"value\":", value, "}")
+            end
+        end
+        print(io, "]")
+    end
+    println("JSON results saved to $json_file")
 end
 
 main()

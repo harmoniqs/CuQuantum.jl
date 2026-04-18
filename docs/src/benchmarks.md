@@ -1,5 +1,7 @@
 # Benchmarks
 
+**[Live time-series dashboard →](https://harmoniqs.github.io/CuQuantum.jl/bench/)** — per-commit GPU benchmark history, populated on every push to `main`.
+
 All benchmarks use the same Lindblad master equation for ``M`` coupled cavities with Fock truncation ``d=3``:
 
 ```math
