@@ -550,13 +550,19 @@ function main()
 
         # Speedup
         if !isnan(gpu_med) && !isnan(cpu_sparse_med)
-            println("  Speedup (sparse/GPU cuDensityMat): $(round(cpu_sparse_med / gpu_med, digits=1))x")
+            println(
+                "  Speedup (sparse/GPU cuDensityMat): $(round(cpu_sparse_med / gpu_med, digits=1))x",
+            )
         end
         if !isnan(gpu_med) && !isnan(cpu_dense_med)
-            println("  Speedup (dense/GPU cuDensityMat):  $(round(cpu_dense_med / gpu_med, digits=1))x")
+            println(
+                "  Speedup (dense/GPU cuDensityMat):  $(round(cpu_dense_med / gpu_med, digits=1))x",
+            )
         end
         if !isnan(gpu_cusparse_med) && !isnan(gpu_med)
-            println("  Speedup (cuSPARSE/cuDensityMat):   $(round(gpu_cusparse_med / gpu_med, digits=1))x")
+            println(
+                "  Speedup (cuSPARSE/cuDensityMat):   $(round(gpu_cusparse_med / gpu_med, digits=1))x",
+            )
         end
 
         push!(
@@ -603,7 +609,14 @@ function main()
                 isnan(value) && continue
                 first || print(io, ",")
                 first = false
-                print(io, "{\"name\":\"", label, "\",\"unit\":\"ms\",\"value\":", value, "}")
+                print(
+                    io,
+                    "{\"name\":\"",
+                    label,
+                    "\",\"unit\":\"ms\",\"value\":",
+                    value,
+                    "}",
+                )
             end
         end
         print(io, "]")
