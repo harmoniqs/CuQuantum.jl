@@ -59,6 +59,9 @@ jobs:
     name: Run Benchmarks
     needs: start-gpu-runner
     runs-on: ${{ needs.start-gpu-runner.outputs.label }}
+    permissions:
+      contents: write
+      pull-requests: write
     env:
       JULIA_CUDA_MEMORY_POOL: none
     timeout-minutes: 120
@@ -79,6 +82,24 @@ jobs:
         with:
           name: benchmark-results-${{ inputs.instance-type }}-${{ github.run_number }}
           path: benchmark/results/
+      # Publish to /bench on gh-pages (time-series chart + regression alerts).
+      # save-data-file and auto-push are gated to main so PR / branch runs never
+      # pollute the published series — they still render a comparison.
+      - name: Publish benchmark to gh-pages
+        if: success() && hashFiles('benchmark/results/bench.json') != ''
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: CuQuantum.jl GPU benchmarks (${{ inputs.instance-type }})
+          tool: customSmallerIsBetter
+          output-file-path: benchmark/results/bench.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: bench
+          alert-threshold: '120%'
+          comment-on-alert: true
+          fail-on-alert: false
+          save-data-file: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
   stop-gpu-runner:
     name: Stop GPU Runner
