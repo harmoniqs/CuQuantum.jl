@@ -9,6 +9,7 @@ deps/build.log
 gen/output/
 trajectory.csv
 benchmark_results*.csv
+benchmark/results/
 benchmark/comparison/results_*.csv
 benchmark/comparison/Manifest.toml
 
@@ -16,6 +17,7 @@ benchmark/comparison/Manifest.toml
 .vscode/
 .idea/
 .ruff_cache/
+.claude/
 *.swp
 *~
 .DS_Store
