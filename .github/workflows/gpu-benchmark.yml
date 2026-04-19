@@ -98,8 +98,8 @@ jobs:
           alert-threshold: '120%'
           comment-on-alert: true
           fail-on-alert: false
-          save-data-file: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          auto-push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          save-data-file: ${{ github.ref == 'refs/heads/main' }}
+          auto-push: ${{ github.ref == 'refs/heads/main' }}
 
   stop-gpu-runner:
     name: Stop GPU Runner
