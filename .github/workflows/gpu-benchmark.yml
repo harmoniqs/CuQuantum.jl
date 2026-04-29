@@ -48,7 +48,7 @@ jobs:
           iam-role-name: ${{ secrets.AWS_GPU_RUNNER_INSTANCE_PROFILE }}
           availability-zones-config: ${{ secrets.AWS_GPU_RUNNER_AZ_CONFIG }}
           aws-resource-tags: >-
-            [{"Key": "gpu-runner", "Value": "true"},
+            [{"Key": "ephemeral-ci-runner", "Value": "true"},
              {"Key": "Project", "Value": "CuQuantum.jl"},
              {"Key": "Purpose", "Value": "benchmark"}]
           pre-runner-script: |
