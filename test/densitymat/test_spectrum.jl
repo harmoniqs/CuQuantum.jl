@@ -1,58 +1,61 @@
 # Phase 9: Eigenspectrum tests
 #
-# The eigenspectrum API may not be supported on all SDK versions / GPU architectures.
-# Tests are guarded to skip gracefully if NOT_SUPPORTED is returned.
+# cuDensityMat 0.7's extreme-eigenspectrum solver supports Hermitian operators with the
+# LARGEST_REAL / SMALLEST_REAL kinds on non-batched double-precision dense pure states,
+# and needs a Hilbert space that is large compared to the Krylov subspace, so the
+# eigenvalue tests use a 16-level mode.
 
-# Helper: check if eigenspectrum is supported on this setup
-function _spectrum_supported()
-    HAS_GPU || return false
-    try
-        ws = WorkStream()
-        dims = [2]
-        data = CUDA.CuVector{ComplexF64}([1.0+0im, 0.0, 0.0, -1.0+0im])
-        elem = CuDensityMat.create_elementary_operator(ws, [2], data)
-        term = CuDensityMat.create_operator_term(ws, dims)
-        CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
-        op = CuDensityMat.create_operator(ws, dims)
-        CuDensityMat.append_term!(op, term; duality = 0)
-        spec = CuDensityMat.create_operator_spectrum(ws, op)
-        CuDensityMat.destroy_operator_spectrum(spec)
-        close(ws)
-        return true
-    catch e
-        if e isa CuDensityMat.CUDENSITYMATError
-            return false
-        end
-        rethrow(e)
+# Single-mode operator diag(-7.5, -6.5, …, 7.5) on a d = 16 Hilbert space.
+const SPECTRUM_DIM = 16
+const SPECTRUM_DIAG = collect(range(-7.5, 7.5; length = SPECTRUM_DIM))
+
+function _spectrum_operator(ws, diag::AbstractVector)
+    d = length(diag)
+    T = ComplexF64
+    m = zeros(T, d, d)
+    for i = 1:d
+        m[i, i] = diag[i]
     end
+    elem = CuDensityMat.create_elementary_operator(ws, [d], CUDA.CuVector{T}(vec(m)))
+    term = CuDensityMat.create_operator_term(ws, [d])
+    CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
+    op = CuDensityMat.create_operator(ws, [d])
+    CuDensityMat.append_term!(op, term; duality = 0)
+    return op
 end
 
-const SPECTRUM_SUPPORTED = _spectrum_supported()
+function _extreme_eigenvalue(kind)
+    T = ComplexF64
+    ws = WorkStream()
+    op = _spectrum_operator(ws, SPECTRUM_DIAG)
+    spec = CuDensityMat.create_operator_spectrum(ws, op; spectrum_kind = kind)
+    template = DensePureState{T}(ws, (SPECTRUM_DIM,); batch_size = 1)
+    CuDensityMat.allocate_storage!(template)
+    CuDensityMat.prepare_spectrum!(ws, spec, 1, template)
+    # The initial guess must not be zero (it seeds the first Krylov block).
+    eigenstate = DensePureState{T}(ws, (SPECTRUM_DIM,); batch_size = 1)
+    CuDensityMat.allocate_storage!(eigenstate)
+    guess = T[1 / i for i = 1:SPECTRUM_DIM]
+    copyto!(eigenstate.storage, CUDA.CuVector{T}(guess ./ LinearAlgebra.norm(guess)))
+    eigenvalues = CUDA.zeros(T, 1)
+    residuals = CuDensityMat.compute_spectrum!(ws, spec, 1, [eigenstate], eigenvalues)
+    λ = Array(eigenvalues)[1]
+    ψ = Array(eigenstate.storage)
+    CuDensityMat.destroy_operator_spectrum(spec)
+    close(ws)
+    return λ, ψ, residuals
+end
 
 @testset "Eigenspectrum (local)" begin
 
-    if !SPECTRUM_SUPPORTED
-        @test_broken false  # eigenspectrum not supported on this SDK version / GPU
-    end
-
     @gpu_test "spectrum creation and destruction" begin
-        SPECTRUM_SUPPORTED || return
         ws = WorkStream()
-        dims = [2]
-        T = ComplexF64
-
-        data = CUDA.CuVector{T}([1.0+0im, 0.0, 0.0, -1.0+0im])
-        elem = CuDensityMat.create_elementary_operator(ws, [2], data)
-        term = CuDensityMat.create_operator_term(ws, dims)
-        CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
-        operator = CuDensityMat.create_operator(ws, dims)
-        CuDensityMat.append_term!(operator, term; duality = 0)
-
+        op = _spectrum_operator(ws, [1.0, -1.0])
         spec = CuDensityMat.create_operator_spectrum(
             ws,
-            operator;
+            op;
             is_hermitian = true,
-            spectrum_kind = CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_LARGEST,
+            spectrum_kind = CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_LARGEST_REAL,
         )
         @test isopen(spec)
         CuDensityMat.destroy_operator_spectrum(spec)
@@ -61,136 +64,81 @@ const SPECTRUM_SUPPORTED = _spectrum_supported()
     end
 
     @gpu_test "spectrum configuration" begin
-        SPECTRUM_SUPPORTED || return
         ws = WorkStream()
-        dims = [2]
-        T = ComplexF64
-
-        data = CUDA.CuVector{T}([1.0+0im, 0.0, 0.0, -1.0+0im])
-        elem = CuDensityMat.create_elementary_operator(ws, [2], data)
-        term = CuDensityMat.create_operator_term(ws, dims)
-        CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
-        operator = CuDensityMat.create_operator(ws, dims)
-        CuDensityMat.append_term!(operator, term; duality = 0)
-
-        spec = CuDensityMat.create_operator_spectrum(ws, operator)
-        # Configure max restarts
+        op = _spectrum_operator(ws, [1.0, -1.0])
+        spec = CuDensityMat.create_operator_spectrum(ws, op)
         CuDensityMat.configure_spectrum!(
             ws,
             spec,
             CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_CONFIG_MAX_RESTARTS,
             30,
         )
-        # Configure max expansion
         CuDensityMat.configure_spectrum!(
             ws,
             spec,
             CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_CONFIG_MAX_EXPANSION,
             10,
         )
-        @test true  # no error means success
-
+        @test isopen(spec)
         CuDensityMat.destroy_operator_spectrum(spec)
         close(ws)
     end
 
-    @gpu_test "eigenvalues of sigma_z (largest)" begin
-        SPECTRUM_SUPPORTED || return
+    @gpu_test "unsupported spectrum configurations raise ArgumentError" begin
         ws = WorkStream()
-        dims = [2]
-        T = ComplexF64
-
-        # sigma_z = diag(1, -1), eigenvalues are +1 and -1
-        data = CUDA.CuVector{T}([1.0+0im, 0.0, 0.0, -1.0+0im])
-        elem = CuDensityMat.create_elementary_operator(ws, [2], data)
-        term = CuDensityMat.create_operator_term(ws, dims)
-        CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
-        operator = CuDensityMat.create_operator(ws, dims)
-        CuDensityMat.append_term!(operator, term; duality = 0)
-
-        spec = CuDensityMat.create_operator_spectrum(
-            ws,
-            operator;
-            is_hermitian = true,
-            spectrum_kind = CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_LARGEST,
+        op = _spectrum_operator(ws, [1.0, -1.0])
+        for kind in (
+            CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_LARGEST,
+            CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_SMALLEST,
         )
-
-        # Template state for Hilbert space structure
-        template = DensePureState{T}(ws, (2,); batch_size = 1)
-        CuDensityMat.allocate_storage!(template)
-
-        # Prepare for 1 eigenstate
-        CuDensityMat.prepare_spectrum!(ws, spec, 1, template)
-
-        # Eigenstate to receive result
-        eigenstate = DensePureState{T}(ws, (2,); batch_size = 1)
-        CuDensityMat.allocate_storage!(eigenstate)
-
-        # Eigenvalue storage (real for Hermitian)
-        eigenvalues = CUDA.zeros(Float64, 1)
-
-        # Compute
-        tolerances = CuDensityMat.compute_spectrum!(
+            @test_throws ArgumentError CuDensityMat.create_operator_spectrum(
+                ws,
+                op;
+                spectrum_kind = kind,
+            )
+        end
+        @test_throws ArgumentError CuDensityMat.create_operator_spectrum(
             ws,
-            spec,
-            1,
-            [eigenstate],
-            eigenvalues;
-            time = 0.0,
-            batch_size = 1,
+            op;
+            is_hermitian = false,
         )
-
-        evals = Array(eigenvalues)
-        # Largest eigenvalue of sigma_z should be +1
-        @test abs(evals[1] - 1.0) < 1e-6
-        @test tolerances[1] < 1e-6  # should converge well
-
-        CuDensityMat.destroy_operator_spectrum(spec)
         close(ws)
     end
 
-    @gpu_test "eigenvalues of sigma_z (smallest)" begin
-        SPECTRUM_SUPPORTED || return
-        ws = WorkStream()
-        dims = [2]
-        T = ComplexF64
-
-        data = CUDA.CuVector{T}([1.0+0im, 0.0, 0.0, -1.0+0im])
-        elem = CuDensityMat.create_elementary_operator(ws, [2], data)
-        term = CuDensityMat.create_operator_term(ws, dims)
-        CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
-        operator = CuDensityMat.create_operator(ws, dims)
-        CuDensityMat.append_term!(operator, term; duality = 0)
-
-        spec = CuDensityMat.create_operator_spectrum(
-            ws,
-            operator;
-            is_hermitian = true,
-            spectrum_kind = CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_SMALLEST,
+    @gpu_test "largest real eigenvalue" begin
+        λ, ψ, residuals = _extreme_eigenvalue(
+            CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_LARGEST_REAL,
         )
+        @test real(λ) ≈ maximum(SPECTRUM_DIAG) atol = 1e-6
+        @test abs(imag(λ)) < 1e-8
+        @test abs(ψ[end]) ≈ 1 atol = 1e-6
+        @test residuals[1] < 1e-6
+    end
 
-        template = DensePureState{T}(ws, (2,); batch_size = 1)
+    @gpu_test "smallest real eigenvalue" begin
+        λ, ψ, residuals = _extreme_eigenvalue(
+            CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_SMALLEST_REAL,
+        )
+        @test real(λ) ≈ minimum(SPECTRUM_DIAG) atol = 1e-6
+        @test abs(ψ[1]) ≈ 1 atol = 1e-6
+        @test residuals[1] < 1e-6
+    end
+
+    @gpu_test "eigenvalue buffer must match the state element type" begin
+        T = ComplexF64
+        ws = WorkStream()
+        op = _spectrum_operator(ws, SPECTRUM_DIAG)
+        spec = CuDensityMat.create_operator_spectrum(ws, op)
+        template = DensePureState{T}(ws, (SPECTRUM_DIM,); batch_size = 1)
         CuDensityMat.allocate_storage!(template)
         CuDensityMat.prepare_spectrum!(ws, spec, 1, template)
-
-        eigenstate = DensePureState{T}(ws, (2,); batch_size = 1)
-        CuDensityMat.allocate_storage!(eigenstate)
-        eigenvalues = CUDA.zeros(Float64, 1)
-
-        tolerances = CuDensityMat.compute_spectrum!(
+        @test_throws ArgumentError CuDensityMat.compute_spectrum!(
             ws,
             spec,
             1,
-            [eigenstate],
-            eigenvalues;
-            time = 0.0,
-            batch_size = 1,
+            [template],
+            CUDA.zeros(Float64, 1),
         )
-
-        evals = Array(eigenvalues)
-        # Smallest eigenvalue of sigma_z should be -1
-        @test abs(evals[1] - (-1.0)) < 1e-6
-
         CuDensityMat.destroy_operator_spectrum(spec)
         close(ws)
     end

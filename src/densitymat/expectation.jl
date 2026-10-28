@@ -86,7 +86,7 @@ end
 
 """
     compute_expectation!(ws, expectation, state, result;
-        time=0.0, batch_size=1, num_params=0, params=nothing)
+        time=0.0, batch_size=state.batch_size, num_params=0, params=nothing)
 
 Compute expectation value: result = Tr(operator * state).
 
@@ -100,7 +100,7 @@ function compute_expectation!(
     state::AbstractState,
     result::CUDA.CuArray;
     time::Real = 0.0,
-    batch_size::Integer = 1,
+    batch_size::Integer = state.batch_size,
     num_params::Integer = 0,
     params::Union{Nothing,CUDA.CuVector{Float64}} = nothing,
 )

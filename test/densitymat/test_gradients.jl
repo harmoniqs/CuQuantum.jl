@@ -689,6 +689,61 @@
         close(ws)
     end
 
+    # cuDensityMat 0.7 refuses to prepare backward differentiation before the forward
+    # action ("Attempt to prepare backward differentiation without preparing the
+    # operator action first!"); prepare_operator_action_backward! prepares it on demand.
+    @gpu_test "backward diff without a preceding forward prepare" begin
+        T = ComplexF64
+        dims = [2]
+        function grad(prepare_forward::Bool)
+            ws = WorkStream()
+            sz = CUDA.CuVector{T}([1.0 + 0im, 0.0, 0.0, -1.0 + 0im])
+            elem = CuDensityMat.create_elementary_operator(ws, [2], sz)
+            term = CuDensityMat.create_operator_term(ws, dims)
+            CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
+            cb, gcb, refs = CuDensityMat.wrap_scalar_callback(
+                (t, p, s) -> (s .= complex.(p[1, :]); nothing);
+                gradient = (t, p, sg, pg) -> (pg[1, :] .+= real.(sg); nothing),
+            )
+            op = CuDensityMat.create_operator(ws, dims)
+            CuDensityMat.append_term!(
+                op,
+                term;
+                coefficient_callback = cb,
+                coefficient_gradient_callback = gcb,
+            )
+            ρin = DenseMixedState{T}(ws, (2,); batch_size = 1)
+            ρout_adj = DenseMixedState{T}(ws, (2,); batch_size = 1)
+            ρin_adj = DenseMixedState{T}(ws, (2,); batch_size = 1)
+            foreach(CuDensityMat.allocate_storage!, (ρin, ρout_adj, ρin_adj))
+            copyto!(ρin.storage, CUDA.CuVector{T}([0.7, -0.3im, 0.3im, 0.3]))
+            copyto!(ρout_adj.storage, CUDA.CuVector{T}([1.0, 0.2 + 0.1im, 0.2 - 0.1im, 0.5]))
+            prepare_forward && CuDensityMat.prepare_operator_action!(ws, op, ρin, ρout_adj)
+            CuDensityMat.prepare_operator_action_backward!(ws, op, ρin, ρout_adj)
+            CuDensityMat.initialize_zero!(ρin_adj)
+            params_grad = CUDA.zeros(Float64, 1)
+            CuDensityMat.compute_operator_action_backward!(
+                ws,
+                op,
+                ρin,
+                ρout_adj,
+                ρin_adj,
+                params_grad;
+                num_params = 1,
+                params = CUDA.CuVector{Float64}([1.5]),
+            )
+            out = (Array(params_grad), Array(ρin_adj.storage))
+            CuDensityMat.unregister_callback!(refs)
+            close(ws)
+            return out
+        end
+        g_auto, adj_auto = grad(false)
+        g_ref, adj_ref = grad(true)
+        @test g_auto ≈ g_ref
+        @test adj_auto ≈ adj_ref
+        @test any(!iszero, g_ref)
+    end
+
     # Note: backward diff without callbacks/params is not supported by the C API
     # (requires numParams >= 1 with gradient callbacks). This is confirmed by
     # NVIDIA's C++ samples which always use at least 1 parameter.

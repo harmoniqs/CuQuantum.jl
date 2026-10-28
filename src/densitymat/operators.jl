@@ -548,9 +548,13 @@ mutable struct Operator
     ws::WorkStream
     hilbert_space_dims::Vector{Int64}
     _term_refs::Vector{Any}
+    # Whether `cudensitymatOperatorPrepareAction` ran since the last structural change;
+    # cuDensityMat 0.7 rejects backward-diff preparation otherwise (see
+    # `prepare_operator_action_backward!`).
+    _action_prepared::Bool
 
     function Operator(handle::cudensitymatOperator_t, ws::WorkStream, dims::Vector{Int64})
-        obj = new(handle, ws, dims, Any[])
+        obj = new(handle, ws, dims, Any[], false)
         finalizer(obj) do x
             if x.handle != C_NULL
                 cudensitymatDestroyOperator(x.handle)
@@ -603,6 +607,7 @@ function append_term!(
         coefficient_gradient_callback,
     )
     push!(op._term_refs, (term, coefficient))
+    op._action_prepared = false
     return nothing
 end
 
@@ -639,6 +644,7 @@ function append_term_batch!(
         coefficient_gradient_callback,
     )
     push!(op._term_refs, (term, static_coefficients, batch_size))
+    op._action_prepared = false
     return nothing
 end
 
@@ -762,9 +768,12 @@ end
 
 """
     compute_action!(ws, action, states_in, state_out;
-        time=0.0, batch_size=0, params=nothing)
+        time=0.0, batch_size=first(states_in).batch_size, num_params=0, params=nothing)
 
 Execute the operator action: `state_out = sum_i operator_i(states_in[i])`.
+
+`batch_size` must be ≥ 1 (cuDensityMat 0.7 rejects 0); it defaults to the batch
+size of the input states.
 """
 function compute_action!(
     ws::WorkStream,
@@ -772,7 +781,7 @@ function compute_action!(
     states_in::AbstractVector{<:AbstractState},
     state_out::AbstractState;
     time::Real = 0.0,
-    batch_size::Integer = 0,
+    batch_size::Integer = first(states_in).batch_size,
     num_params::Integer = 0,
     params::Union{Nothing,CUDA.CuVector{Float64}} = nothing,
 )
@@ -827,6 +836,7 @@ function prepare_operator_action!(
         ws.workspace,
         CUDA.stream().handle,
     )
+    operator._action_prepared = true
     required = workspace_query_size(ws)
     if required > 0
         workspace_allocate!(ws, required)
@@ -836,9 +846,13 @@ end
 
 """
     compute_operator_action!(ws, operator, state_in, state_out;
-        time=0.0, batch_size=0, params=nothing)
+        time=0.0, batch_size=state_in.batch_size, num_params=0, params=nothing)
 
-Execute single-operator action: `state_out = operator * state_in`.
+Execute single-operator action: `state_out += operator * state_in`.
+
+`batch_size` must be ≥ 1: `cudensitymatOperatorComputeAction` documents
+`batchSize (>=1)` and cuDensityMat 0.7 returns `CUDENSITYMAT_STATUS_INVALID_VALUE`
+for 0. It defaults to the batch size of `state_in`.
 """
 function compute_operator_action!(
     ws::WorkStream,
@@ -846,7 +860,7 @@ function compute_operator_action!(
     state_in::AbstractState,
     state_out::AbstractState;
     time::Real = 0.0,
-    batch_size::Integer = 0,
+    batch_size::Integer = state_in.batch_size,
     num_params::Integer = 0,
     params::Union{Nothing,CUDA.CuVector{Float64}} = nothing,
 )
@@ -878,6 +892,14 @@ end
 
 Prepare backward differentiation of a single-operator action.
 
+cuDensityMat 0.7 requires the forward action of the operator to be prepared first
+(`cudensitymatOperatorPrepareActionBackwardDiff` otherwise fails with
+`CUDENSITYMAT_STATUS_INVALID_VALUE`, logging "Attempt to prepare backward
+differentiation without preparing the operator action first!"). If
+[`prepare_operator_action!`](@ref) has not run on `operator` since its last
+`append_term!`, it is run here with `state_out_adj` as the representative output
+state, which is congruent to the forward output by construction.
+
 # Arguments
 - `state_in`: The forward-pass input state
 - `state_out_adj`: The adjoint of the forward-pass output state (∂L/∂state_out)
@@ -891,6 +913,14 @@ function prepare_operator_action_backward!(
     workspace_limit::Union{Nothing,Integer} = nothing,
 )
     _check_valid(ws)
+    operator._action_prepared || prepare_operator_action!(
+        ws,
+        operator,
+        state_in,
+        state_out_adj;
+        compute_type,
+        workspace_limit,
+    )
     mem_limit = _get_workspace_limit(ws, workspace_limit)
     cudensitymatOperatorPrepareActionBackwardDiff(
         ws.handle,
@@ -911,7 +941,7 @@ end
 
 """
     compute_operator_action_backward!(ws, operator, state_in, state_out_adj,
-        state_in_adj, params_grad; time=0.0, batch_size=0,
+        state_in_adj, params_grad; time=0.0, batch_size=state_in.batch_size,
         num_params=0, params=nothing)
 
 Compute backward differentiation of a single-operator action.
@@ -933,7 +963,7 @@ function compute_operator_action_backward!(
     state_in_adj::AbstractState,
     params_grad::CUDA.CuVector{Float64};
     time::Real = 0.0,
-    batch_size::Integer = 0,
+    batch_size::Integer = state_in.batch_size,
     num_params::Integer = 0,
     params::Union{Nothing,CUDA.CuVector{Float64}} = nothing,
 )
