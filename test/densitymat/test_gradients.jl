@@ -690,8 +690,9 @@
     end
 
     # cuDensityMat 0.7 refuses to prepare backward differentiation before the forward
-    # action ("Attempt to prepare backward differentiation without preparing the
-    # operator action first!"); prepare_operator_action_backward! prepares it on demand.
+    # action ("Super-operator action on a mixed dense quantum state required by
+    # backward differentiation has not been prepared!");
+    # prepare_operator_action_backward! prepares it on demand.
     @gpu_test "backward diff without a preceding forward prepare" begin
         T = ComplexF64
         dims = [2]

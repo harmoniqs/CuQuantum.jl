@@ -196,6 +196,31 @@
         close(ws)
     end
 
+    @gpu_test "attach_buffer! after prepare is used by the next compute" begin
+        T = ComplexF64
+        ws = WorkStream()
+        dims = [2]
+        elem = CuDensityMat.create_elementary_operator(ws, [2], CUDA.CuVector{T}([1, 0, 0, -1]))
+        term = CuDensityMat.create_operator_term(ws, dims)
+        CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
+        op = CuDensityMat.create_operator(ws, dims)
+        CuDensityMat.append_term!(op, term; duality = 0)
+        ψin = DensePureState{T}(ws, (2,); batch_size = 1)
+        ψout = DensePureState{T}(ws, (2,); batch_size = 1)
+        CuDensityMat.allocate_storage!(ψin)
+        CuDensityMat.allocate_storage!(ψout)
+        copyto!(ψin.storage, CUDA.CuVector{T}([1, 0]))
+        CuDensityMat.prepare_operator_action!(ws, op, ψin, ψout)
+        CuDensityMat.initialize_zero!(ψout)
+        CuDensityMat.compute_operator_action!(ws, op, ψin, ψout)
+        @test Array(ψout.storage) ≈ T[1, 0]
+        CuDensityMat.attach_buffer!(elem, CUDA.CuVector{T}([0, 1, 1, 0]))
+        CuDensityMat.initialize_zero!(ψout)
+        CuDensityMat.compute_operator_action!(ws, op, ψin, ψout)
+        @test Array(ψout.storage) ≈ T[0, 1]
+        close(ws)
+    end
+
     @gpu_test "attach_buffer! on a matrix operator" begin
         T = ComplexF64
         ws = WorkStream()

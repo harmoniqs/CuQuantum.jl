@@ -304,7 +304,9 @@ Point an existing elementary or dense local matrix operator at new element stora
 `cudensitymatMatrixOperatorDenseLocalAttachBuffer`, cuDensityMat ≥ 0.7), e.g. to
 swap pre-computed operator data between time steps without rebuilding the operator.
 `data` must have the same size in bytes as the storage it replaces; the operator
-keeps a reference to it.
+keeps a reference to it. The new data is used by the next compute call; on
+cuDensityMat 0.7.0 no re-preparation of the action is needed (the header does not
+specify this either way).
 """
 function attach_buffer!(op::ElementaryOperator, data::CUDACore.CuArray)
     _check_buffer_size(op, data)
@@ -852,7 +854,8 @@ Execute single-operator action: `state_out += operator * state_in`.
 
 `batch_size` must be ≥ 1: `cudensitymatOperatorComputeAction` documents
 `batchSize (>=1)` and cuDensityMat 0.7 returns `CUDENSITYMAT_STATUS_INVALID_VALUE`
-for 0. It defaults to the batch size of `state_in`.
+for 0 ("Argument batchSize must be positive!"). It defaults to the batch size of
+`state_in`.
 """
 function compute_operator_action!(
     ws::WorkStream,
@@ -894,8 +897,9 @@ Prepare backward differentiation of a single-operator action.
 
 cuDensityMat 0.7 requires the forward action of the operator to be prepared first
 (`cudensitymatOperatorPrepareActionBackwardDiff` otherwise fails with
-`CUDENSITYMAT_STATUS_INVALID_VALUE`, logging "Attempt to prepare backward
-differentiation without preparing the operator action first!"). If
+`CUDENSITYMAT_STATUS_INVALID_VALUE`; with `CUDENSITYMAT_LOG_LEVEL=1` it logs
+"Super-operator action on a mixed dense quantum state required by backward
+differentiation has not been prepared!"). If
 [`prepare_operator_action!`](@ref) has not run on `operator` since its last
 `append_term!`, it is run here with `state_out_adj` as the representative output
 state, which is congruent to the forward output by construction.
