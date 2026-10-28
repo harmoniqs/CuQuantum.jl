@@ -1,0 +1,113 @@
+[general]
+library_name = "libcudensitymat"
+output_file_path = "src/densitymat/libcudensitymat.jl"
+prologue_file_path = "libcudensitymat_prologue.jl"
+output_ignorelist = [
+    # these change every release; query `cudensitymatGetVersion()` instead
+    "CUDENSITYMAT_MAJOR",
+    "CUDENSITYMAT_MINOR",
+    "CUDENSITYMAT_PATCH",
+    "CUDENSITYMAT_VERSION",
+]
+
+[codegen]
+use_ccall_macro = true
+always_NUL_terminated_string = true
+
+[api]
+checked_rettypes = ["cudensitymatStatus_t"]
+
+[api.cudensitymatGetVersion]
+needs_context = false
+
+# Device-pointer arguments. Indices are 1-based argument positions; check them
+# against the header whenever the C API changes (generate.jl errors on unknown
+# function names, not on shifted indices).
+
+[api.cudensitymatCreateElementaryOperator.argtypes]
+8 = "CuPtr{Cvoid}"
+
+[api.cudensitymatCreateElementaryOperatorBatch.argtypes]
+9 = "CuPtr{Cvoid}"
+
+[api.cudensitymatCreateMatrixOperatorDenseLocal.argtypes]
+5 = "CuPtr{Cvoid}"
+
+[api.cudensitymatCreateMatrixOperatorDenseLocalBatch.argtypes]
+6 = "CuPtr{Cvoid}"
+
+[api.cudensitymatExpectationCompute.argtypes]
+6 = "CuPtr{Cdouble}"
+8 = "CuPtr{Cvoid}"
+
+[api.cudensitymatOperatorActionCompute.argtypes]
+6 = "CuPtr{Cdouble}"
+
+[api.cudensitymatOperatorAppendTermBatch.argtypes]
+6 = "CuPtr{ComplexF64}"
+7 = "CuPtr{ComplexF64}"
+
+[api.cudensitymatOperatorComputeAction.argtypes]
+6 = "CuPtr{Cdouble}"
+
+[api.cudensitymatOperatorComputeActionBackwardDiff.argtypes]
+6 = "CuPtr{Cdouble}"
+10 = "CuPtr{Cdouble}"
+
+[api.cudensitymatOperatorSpectrumCompute.argtypes]
+6 = "CuPtr{Cdouble}"
+9 = "CuPtr{Cvoid}"
+
+[api.cudensitymatOperatorTermAppendElementaryProductBatch.argtypes]
+8 = "CuPtr{ComplexF64}"
+9 = "CuPtr{ComplexF64}"
+
+[api.cudensitymatOperatorTermAppendMatrixProductBatch.argtypes]
+8 = "CuPtr{ComplexF64}"
+9 = "CuPtr{ComplexF64}"
+
+[api.cudensitymatStateAttachComponentStorage.argtypes]
+4 = "Ptr{CuPtr{Cvoid}}"
+
+[api.cudensitymatStateComputeAccumulation.argtypes]
+4 = "CuPtr{Cvoid}"
+
+[api.cudensitymatStateComputeInnerProduct.argtypes]
+4 = "CuPtr{Cvoid}"
+
+[api.cudensitymatStateComputeNorm.argtypes]
+3 = "CuPtr{Cvoid}"
+
+[api.cudensitymatStateComputeScaling.argtypes]
+3 = "CuPtr{Cvoid}"
+
+[api.cudensitymatStateComputeTrace.argtypes]
+3 = "CuPtr{Cvoid}"
+
+[api.cudensitymatWorkspaceGetMemory.argtypes]
+5 = "Ptr{CuPtr{Cvoid}}"
+
+[api.cudensitymatWorkspaceSetMemory.argtypes]
+5 = "CuPtr{Cvoid}"
+
+[api.cudensitymatCreateMatrixProductOperator.argtypes]
+7 = "Ptr{CuPtr{Cvoid}}"
+
+[api.cudensitymatAttachBatchedCoefficients.argtypes]
+4 = "Ptr{CuPtr{Cvoid}}"
+5 = "Ptr{CuPtr{Cvoid}}"
+7 = "Ptr{CuPtr{Cvoid}}"
+8 = "Ptr{CuPtr{Cvoid}}"
+
+[api.cudensitymatTimePropagationCompute.argtypes]
+8 = "CuPtr{Cdouble}"
+
+[api.cudensitymatEigenDecompositionCompute.argtypes]
+6 = "CuPtr{Cdouble}"
+9 = "CuPtr{Cvoid}"
+
+[api.cudensitymatElementaryOperatorAttachBuffer.argtypes]
+3 = "CuPtr{Cvoid}"
+
+[api.cudensitymatMatrixOperatorDenseLocalAttachBuffer.argtypes]
+3 = "CuPtr{Cvoid}"

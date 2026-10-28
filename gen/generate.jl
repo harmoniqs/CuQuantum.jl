@@ -1,54 +1,133 @@
-# Clang.jl binding generator for cuDensityMat
+# Clang.jl binding generator for cuDensityMat.
 #
-# This script uses Clang.jl to auto-generate Julia bindings from the
-# cuDensityMat C headers shipped with cuQuantum_jll.
+# Usage (from the repository root):
 #
-# Usage:
-#   julia --project=gen gen/generate.jl
+#     julia --project=gen -e 'using Pkg; Pkg.instantiate()'
+#     julia --project=gen gen/generate.jl
 #
-# The generated output is written to gen/output/ for inspection.
-# Hand-written bindings in src/densitymat/libcudensitymat.jl are authoritative;
-# this script is for future re-generation when the C API changes.
+# Parses `cudensitymat.h` from the pinned cuQuantum_jll artifact and writes
+# `src/densitymat/libcudensitymat.jl` (do not edit that file by hand).
+#
+# The pass structure mirrors CUDA.jl's `res/wrap/wrap.jl` (MIT licensed), so that
+# the output and the `cudensitymat.toml` options file can move into CUDA.jl's
+# `res/wrap/` unchanged when this package is upstreamed (see UPSTREAMING.md):
+#
+# - `@ccall` is rewritten to `@gcsafe_ccall`;
+# - every function is prefixed with `initialize_context()` unless the TOML says
+#   `needs_context = false`;
+# - functions returning a type in `api.checked_rettypes` are wrapped in `@checked`;
+# - argument types are overridden per function with `[api.<fn>.argtypes]`
+#   (1-based argument index => Julia type), used to mark device pointers as
+#   `CuPtr`/`PtrOrCuPtr`.
+#
+# CUDA headers: cudensitymat.h includes `library_types.h`, `cuComplex.h` and
+# `cuda_runtime_api.h`. By default the minimal stand-ins in `gen/cuda_stub/` are
+# used (the wrapped header only needs the type names; the Julia types come from
+# CUDACore). Set `CUDA_INCLUDE_DIR` to the `include` directory of a CUDA toolkit
+# to parse against the real headers instead.
 
 using Clang
 using Clang.Generators
+using JuliaFormatter
 using cuQuantum_jll
 
-# Locate headers
-const CUQUANTUM_INCLUDE = joinpath(cuQuantum_jll.artifact_dir, "include")
-const CUDENSITYMAT_HEADER = joinpath(CUQUANTUM_INCLUDE, "cudensitymat.h")
+const REPO = dirname(@__DIR__)
 
-if !isfile(CUDENSITYMAT_HEADER)
-    error("cudensitymat.h not found at $CUDENSITYMAT_HEADER")
+function cuda_include_dir()
+    if haskey(ENV, "CUDA_INCLUDE_DIR")
+        dir = ENV["CUDA_INCLUDE_DIR"]
+        isdir(dir) || error("CUDA_INCLUDE_DIR=$dir does not exist")
+        return dir
+    end
+    return joinpath(@__DIR__, "cuda_stub")
 end
 
-# Output directory
-const OUTPUT_DIR = joinpath(@__DIR__, "output")
-mkpath(OUTPUT_DIR)
+function rewriter!(ctx, options)
+    api = get(options, "api", Dict{String,Any}())
+    checked_types = get(api, "checked_rettypes", String[])
+    seen = Set{String}()
+    for node in get_nodes(ctx.dag)
+        Generators.is_function(node) || continue
+        Generators.is_variadic_function(node) && continue
 
-# Generator options
-const GENERATOR_TOML = joinpath(@__DIR__, "generator.toml")
-options = if isfile(GENERATOR_TOML)
-    load_options(GENERATOR_TOML)
-else
-    @warn "generator.toml not found, using defaults"
-    Dict{String,Any}()
+        expr = node.exprs[1]
+        call_expr = expr.args[2].args[1].args[3]  # assumes `use_ccall_macro = true`
+        expr.args[2].args[1].args[1] = Symbol("@gcsafe_ccall")
+
+        target_expr = call_expr.args[1].args[1]
+        fn = String(target_expr.args[2].value)
+        push!(seen, fn)
+        fn_options = get(api, fn, Dict{String,Any}())
+
+        arg_exprs = call_expr.args[1].args[2:end]
+        for (arg, typ) in get(fn_options, "argtypes", Dict{String,Any}())
+            i = parse(Int, arg)
+            i in 1:length(arg_exprs) ||
+                error("invalid argtypes for $fn: index $arg is out of bounds")
+            arg_exprs[i].args[2] = Meta.parse(typ)
+        end
+
+        if get(fn_options, "needs_context", true)
+            pushfirst!(expr.args[2].args, :(initialize_context()))
+        end
+
+        rettyp = call_expr.args[2]
+        if rettyp isa Symbol && String(rettyp) in checked_types
+            node.exprs[1] = Expr(:macrocall, Symbol("@checked"), nothing, expr)
+        end
+    end
+
+    # catch stale overrides (e.g. after an ABI change renamed or removed a function)
+    for fn in keys(api)
+        fn == "checked_rettypes" && continue
+        fn in seen || error("cudensitymat.toml has options for unknown function $fn")
+    end
 end
 
-args = get_default_args()
-push!(args, "-I$CUQUANTUM_INCLUDE")
+function main()
+    cuquantum = joinpath(cuQuantum_jll.artifact_dir, "include")
+    header = joinpath(cuquantum, "cudensitymat.h")
+    isfile(header) || error("cudensitymat.h not found at $header")
 
-# Find CUDA include path for cuda_runtime.h etc.
-try
-    using CUDA_Runtime_Discovery
-    cuda_path = CUDA_Runtime_Discovery.cuda_toolkit_path()
-    push!(args, "-I$(joinpath(cuda_path, "include"))")
-catch
-    @warn "Could not find CUDA toolkit include path; generation may fail"
+    options = load_options(joinpath(@__DIR__, "cudensitymat.toml"))
+    options["general"]["output_file_path"] =
+        joinpath(REPO, options["general"]["output_file_path"])
+    options["general"]["prologue_file_path"] =
+        joinpath(@__DIR__, options["general"]["prologue_file_path"])
+
+    args = get_default_args()
+    push!(args, "-I$cuquantum", "-isystem$(cuda_include_dir())")
+
+    ctx = create_context([header], args, options)
+    build!(ctx, BUILDSTAGE_NO_PRINTING)
+
+    # only keep declarations from cudensitymat.h itself
+    replace!(get_nodes(ctx.dag)) do node
+        path = normpath(Clang.get_filename(node.cursor))
+        endswith(path, "cudensitymat.h") && return node
+        return ExprNode(node.id, Generators.Skip(), node.cursor, Expr[], node.adj)
+    end
+
+    rewriter!(ctx, options)
+    build!(ctx, BUILDSTAGE_PRINTING_ONLY)
+
+    output_file = options["general"]["output_file_path"]
+    data = read(output_file, String)
+    open(output_file, "w") do io
+        println(io, "# This file is automatically generated. Do not edit!")
+        println(io, "# To re-generate, execute gen/generate.jl")
+        println(
+            io,
+            "# Source: cudensitymat.h from cuQuantum_jll v$(pkgversion(cuQuantum_jll))",
+        )
+        println(io)
+        print(io, data)
+    end
+    format_file(output_file)
+    @info "Wrote $output_file"
+    return
 end
 
-ctx = create_context([CUDENSITYMAT_HEADER], args, options)
-
-build!(ctx)
-
-println("Generated bindings written to $OUTPUT_DIR")
+if abspath(PROGRAM_FILE) == @__FILE__
+    main()
+end

@@ -6,6 +6,7 @@
 
 export ElementaryOperator, create_elementary_operator, destroy_elementary_operator
 export MatrixOperator, create_matrix_operator, destroy_matrix_operator
+export attach_buffer!
 export OperatorTerm, create_operator_term, destroy_operator_term
 export Operator, create_operator, destroy_operator
 export OperatorAction, create_operator_action, destroy_operator_action
@@ -293,6 +294,52 @@ function create_matrix_operator_batch(
     )
 
     return MatrixOperator(op_ref[], ws; data_ref = data)
+end
+
+"""
+    attach_buffer!(op::Union{ElementaryOperator,MatrixOperator}, data::CuArray) -> op
+
+Point an existing elementary or dense local matrix operator at new element storage
+(`cudensitymatElementaryOperatorAttachBuffer` /
+`cudensitymatMatrixOperatorDenseLocalAttachBuffer`, cuDensityMat ≥ 0.7), e.g. to
+swap pre-computed operator data between time steps without rebuilding the operator.
+`data` must have the same size in bytes as the storage it replaces; the operator
+keeps a reference to it.
+"""
+function attach_buffer!(op::ElementaryOperator, data::CUDA.CuArray)
+    _check_buffer_size(op, data)
+    cudensitymatElementaryOperatorAttachBuffer(
+        op.ws.handle,
+        op.handle,
+        pointer(data),
+        Csize_t(sizeof(data)),
+    )
+    op._data_ref = data
+    return op
+end
+
+function attach_buffer!(op::MatrixOperator, data::CUDA.CuArray)
+    _check_buffer_size(op, data)
+    cudensitymatMatrixOperatorDenseLocalAttachBuffer(
+        op.ws.handle,
+        op.handle,
+        pointer(data),
+        Csize_t(sizeof(data)),
+    )
+    op._data_ref = data
+    return op
+end
+
+function _check_buffer_size(op, data)
+    old = op._data_ref
+    old isa CUDA.CuArray &&
+        sizeof(old) != sizeof(data) &&
+        throw(
+            ArgumentError(
+                "buffer has $(sizeof(data)) bytes, the operator's storage has $(sizeof(old))",
+            ),
+        )
+    return nothing
 end
 
 function destroy_matrix_operator(op::MatrixOperator)
@@ -643,15 +690,36 @@ function destroy_operator_action(action::OperatorAction)
 end
 
 """
-    create_operator_action(ws, operators::Vector{Operator}) -> OperatorAction
+    create_operator_action(ws, operators::Vector{Operator};
+        scope=CUDENSITYMAT_FITTING_SCOPE_FULL,
+        approach=CUDENSITYMAT_FITTING_APPROACH_LINSOLVE) -> OperatorAction
 
 Create an operator action descriptor for multiple operators.
+
+`scope` selects the state-fitting code path used to represent the output state:
+`CUDENSITYMAT_FITTING_SCOPE_FULL` for dense states (the default, and the behavior
+of cuDensityMat < 0.7) or `CUDENSITYMAT_FITTING_SCOPE_SPLIT` for factorized
+(MPS) states. `approach` selects the gauge strategy; LinSolve is the only one
+cuDensityMat 0.7 provides. Split-scope fitting is configured afterwards with
+`cudensitymatOperatorActionConfigure`.
 """
-function create_operator_action(ws::WorkStream, operators::Vector{Operator})
+function create_operator_action(
+    ws::WorkStream,
+    operators::Vector{Operator};
+    scope::cudensitymatStateFittingScopeKind_t = CUDENSITYMAT_FITTING_SCOPE_FULL,
+    approach::cudensitymatStateFittingApproachKind_t = CUDENSITYMAT_FITTING_APPROACH_LINSOLVE,
+)
     _check_valid(ws)
     handles = cudensitymatOperator_t[op.handle for op in operators]
     action_ref = Ref{cudensitymatOperatorAction_t}()
-    cudensitymatCreateOperatorAction(ws.handle, Int32(length(handles)), handles, action_ref)
+    cudensitymatCreateOperatorAction(
+        ws.handle,
+        Int32(length(handles)),
+        handles,
+        scope,
+        approach,
+        action_ref,
+    )
     return OperatorAction(action_ref[], ws, operators)
 end
 

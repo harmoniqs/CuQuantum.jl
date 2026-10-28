@@ -12,6 +12,17 @@
 #
 # GC safety: all registered callbacks are held in a global IdDict to prevent
 # garbage collection while the C library holds raw pointers.
+#
+# Two kinds of trampolines exist, selected by the `device` keyword of
+# `wrap_scalar_callback` / `wrap_tensor_callback`:
+#   - CPU (CUDENSITYMAT_CALLBACK_DEVICE_CPU): buffers are host memory, wrapped as
+#     `Array`s; the user function computes on the host.
+#   - GPU (CUDENSITYMAT_CALLBACK_DEVICE_GPU): buffers are device memory, wrapped as
+#     `CuDeviceArray`s, and the library's CUDA stream is passed as a `CuStream`.
+#     The user function enqueues CUDA.jl kernels on that stream
+#     (`@cuda stream=stream kernel(storage, ...)`) and returns without
+#     synchronizing. The stream is not owned by CUDA.jl unless it is the task's
+#     stream, so it can't be used with `CuArray`s (see `unsafe_wrap(CuStream, ...)`).
 
 export wrap_scalar_callback, wrap_tensor_callback
 
@@ -350,6 +361,221 @@ function _init_tensor_gradient_wrapper!()
 end
 
 # =============================================================================
+# GPU trampolines (CUDENSITYMAT_CALLBACK_DEVICE_GPU)
+#
+# Same C signatures as the CPU trampolines. The buffers are device pointers and
+# are exposed as `CuDeviceArray`s (no CUDA.jl memory management involved), and
+# the stream is exposed as a `CuStream` for launching kernels on.
+#
+# User function signatures (all return nothing; work is enqueued on `stream`):
+#   scalar:          f(time, params::CuDeviceMatrix{Float64}, storage::CuDeviceVector{T}, stream)
+#   tensor:          f(time, params, storage::CuDeviceArray{T}, stream)
+#   scalar gradient: g(time, params, scalar_grad::CuDeviceVector{T}, params_grad::CuDeviceMatrix{Float64}, stream)
+#   tensor gradient: g(time, params, tensor_grad::CuDeviceArray{T}, params_grad, stream)
+# =============================================================================
+
+const _AS_Global = CUDA.CUDACore.AS.Global
+
+function _device_array(::Type{T}, ptr::Ptr, dims::Dims{N}) where {T,N}
+    return CuDeviceArray{T,N,_AS_Global}(reinterpret(Core.LLVMPtr{T,_AS_Global}, ptr), dims)
+end
+
+# The library passes the stream it was given (normally the task's stream, which
+# CUDA.jl owns), or a stream CUDA.jl doesn't know about, or the NULL stream.
+function _callback_stream(handle::CUstream)
+    handle == C_NULL && return CUDA.default_stream()
+    task_stream = CUDA.stream()
+    task_stream.handle == handle && return task_stream
+    return unsafe_wrap(CuStream, handle)
+end
+
+_device_params(params_ptr, num_params, batch_size) =
+    _device_array(Float64, params_ptr, (Int(num_params), Int(batch_size)))
+
+function _gpu_scalar_callback_wrapper(
+    callback_ptr::Ptr{Cvoid},
+    time::Cdouble,
+    batch_size::Int64,
+    num_params::Int32,
+    params_ptr::Ptr{Cdouble},
+    data_type::cudaDataType_t,
+    storage_ptr::Ptr{Cvoid},
+    stream::CUstream,
+)::Int32
+    try
+        f = _get_callback(UInt(callback_ptr))
+        T = _cuda_dtype_to_julia(data_type)
+        params = _device_params(params_ptr, num_params, batch_size)
+        storage = _device_array(T, storage_ptr, (Int(batch_size),))
+        f(time, params, storage, _callback_stream(stream))
+        return Int32(0)
+    catch e
+        @error "GPU scalar callback error" exception=(e, catch_backtrace())
+        return Int32(-1)
+    end
+end
+
+function _gpu_tensor_callback_wrapper(
+    callback_ptr::Ptr{Cvoid},
+    sparsity::cudensitymatElementaryOperatorSparsity_t,
+    num_modes::Int32,
+    mode_extents_ptr::Ptr{Int64},
+    diagonal_offsets_ptr::Ptr{Int32},
+    time::Cdouble,
+    batch_size::Int64,
+    num_params::Int32,
+    params_ptr::Ptr{Cdouble},
+    data_type::cudaDataType_t,
+    storage_ptr::Ptr{Cvoid},
+    stream::CUstream,
+)::Int32
+    try
+        f = _get_callback(UInt(callback_ptr))
+        T = _cuda_dtype_to_julia(data_type)
+        params = _device_params(params_ptr, num_params, batch_size)
+        # modeExtents is a host array (see the CPU trampoline for the layout)
+        mode_extents = unsafe_wrap(Array, mode_extents_ptr, (Int(num_modes),))
+        shape = (Int.(mode_extents)..., Int(batch_size))
+        storage = _device_array(T, storage_ptr, shape)
+        f(time, params, storage, _callback_stream(stream))
+        return Int32(0)
+    catch e
+        @error "GPU tensor callback error" exception=(e, catch_backtrace())
+        return Int32(-1)
+    end
+end
+
+function _gpu_scalar_gradient_callback_wrapper(
+    callback_ptr::Ptr{Cvoid},
+    time::Cdouble,
+    batch_size::Int64,
+    num_params::Int32,
+    params_ptr::Ptr{Cdouble},
+    data_type::cudaDataType_t,
+    scalar_grad_ptr::Ptr{Cvoid},
+    params_grad_ptr::Ptr{Cdouble},
+    stream::CUstream,
+)::Int32
+    try
+        f = _get_callback(UInt(callback_ptr))
+        T = _cuda_dtype_to_julia(data_type)
+        params = _device_params(params_ptr, num_params, batch_size)
+        scalar_grad = _device_array(T, scalar_grad_ptr, (Int(batch_size),))
+        params_grad = _device_params(params_grad_ptr, num_params, batch_size)
+        f(time, params, scalar_grad, params_grad, _callback_stream(stream))
+        return Int32(0)
+    catch e
+        @error "GPU scalar gradient callback error" exception=(e, catch_backtrace())
+        return Int32(-1)
+    end
+end
+
+function _gpu_tensor_gradient_callback_wrapper(
+    callback_ptr::Ptr{Cvoid},
+    sparsity::cudensitymatElementaryOperatorSparsity_t,
+    num_modes::Int32,
+    mode_extents_ptr::Ptr{Int64},
+    diagonal_offsets_ptr::Ptr{Int32},
+    time::Cdouble,
+    batch_size::Int64,
+    num_params::Int32,
+    params_ptr::Ptr{Cdouble},
+    data_type::cudaDataType_t,
+    tensor_grad_ptr::Ptr{Cvoid},
+    params_grad_ptr::Ptr{Cdouble},
+    stream::CUstream,
+)::Int32
+    try
+        f = _get_callback(UInt(callback_ptr))
+        T = _cuda_dtype_to_julia(data_type)
+        params = _device_params(params_ptr, num_params, batch_size)
+        mode_extents = unsafe_wrap(Array, mode_extents_ptr, (Int(num_modes),))
+        shape = (Int.(mode_extents)..., Int(batch_size))
+        tensor_grad = _device_array(T, tensor_grad_ptr, shape)
+        params_grad = _device_params(params_grad_ptr, num_params, batch_size)
+        f(time, params, tensor_grad, params_grad, _callback_stream(stream))
+        return Int32(0)
+    catch e
+        @error "GPU tensor gradient callback error" exception=(e, catch_backtrace())
+        return Int32(-1)
+    end
+end
+
+const _gpu_scalar_wrapper_ptr = Ref{Ptr{Cvoid}}(C_NULL)
+const _gpu_tensor_wrapper_ptr = Ref{Ptr{Cvoid}}(C_NULL)
+const _gpu_scalar_gradient_wrapper_ptr = Ref{Ptr{Cvoid}}(C_NULL)
+const _gpu_tensor_gradient_wrapper_ptr = Ref{Ptr{Cvoid}}(C_NULL)
+
+function _init_gpu_wrappers!()
+    _gpu_scalar_wrapper_ptr[] = @cfunction(
+        _gpu_scalar_callback_wrapper,
+        Int32,
+        (
+            Ptr{Cvoid},
+            Cdouble,
+            Int64,
+            Int32,
+            Ptr{Cdouble},
+            cudaDataType_t,
+            Ptr{Cvoid},
+            CUstream,
+        )
+    )
+    _gpu_tensor_wrapper_ptr[] = @cfunction(
+        _gpu_tensor_callback_wrapper,
+        Int32,
+        (
+            Ptr{Cvoid},
+            cudensitymatElementaryOperatorSparsity_t,
+            Int32,
+            Ptr{Int64},
+            Ptr{Int32},
+            Cdouble,
+            Int64,
+            Int32,
+            Ptr{Cdouble},
+            cudaDataType_t,
+            Ptr{Cvoid},
+            CUstream,
+        )
+    )
+    _gpu_scalar_gradient_wrapper_ptr[] = @cfunction(
+        _gpu_scalar_gradient_callback_wrapper,
+        Int32,
+        (
+            Ptr{Cvoid},
+            Cdouble,
+            Int64,
+            Int32,
+            Ptr{Cdouble},
+            cudaDataType_t,
+            Ptr{Cvoid},
+            Ptr{Cdouble},
+            CUstream,
+        )
+    )
+    _gpu_tensor_gradient_wrapper_ptr[] = @cfunction(
+        _gpu_tensor_gradient_callback_wrapper,
+        Int32,
+        (
+            Ptr{Cvoid},
+            cudensitymatElementaryOperatorSparsity_t,
+            Int32,
+            Ptr{Int64},
+            Ptr{Int32},
+            Cdouble,
+            Int64,
+            Int32,
+            Ptr{Cdouble},
+            cudaDataType_t,
+            Ptr{Cvoid},
+            Ptr{Cdouble},
+            CUstream,
+        )
+    )
+end
+
+# =============================================================================
 # Initialize all wrapper pointers (called from __init__)
 # =============================================================================
 
@@ -358,6 +584,14 @@ function _init_callback_wrappers!()
     _init_tensor_wrapper!()
     _init_scalar_gradient_wrapper!()
     _init_tensor_gradient_wrapper!()
+    _init_gpu_wrappers!()
+end
+
+# cuDensityMat device enum for a `device` keyword value
+function _callback_device(device::Symbol)
+    device === :cpu && return CUDENSITYMAT_CALLBACK_DEVICE_CPU
+    device === :gpu && return CUDENSITYMAT_CALLBACK_DEVICE_GPU
+    throw(ArgumentError("callback device must be :cpu or :gpu, got :$device"))
 end
 
 # =============================================================================
@@ -365,16 +599,25 @@ end
 # =============================================================================
 
 """
-    wrap_scalar_callback(f; gradient=nothing) -> (cb, gcb, refs)
+    wrap_scalar_callback(f; gradient=nothing, device=:cpu) -> (cb, gcb, refs)
 
 Wrap a Julia function as a scalar callback for time-dependent coefficients.
 
 # Arguments
-- `f`: Function with signature `f(time::Float64, params::Matrix{Float64}, storage::Vector{T})`
-  where `T` matches the operator's data type. `params` is `(numParams, batchSize)`,
-  `storage` is `(batchSize,)`. Write the coefficient values into `storage`.
-- `gradient`: Optional gradient function with signature
-  `g(time::Float64, params::Matrix{Float64}, scalar_grad::Vector{T}, params_grad::Matrix{Float64})`
+- `f`: the coefficient function. For `device = :cpu`,
+  `f(time::Float64, params::Matrix{Float64}, storage::Vector{T})` computes on the host;
+  for `device = :gpu`,
+  `f(time::Float64, params::CuDeviceMatrix{Float64}, storage::CuDeviceVector{T}, stream::CuStream)`
+  enqueues CUDA.jl kernels on `stream` (e.g. `@cuda stream=stream kernel(storage, params, time)`)
+  and returns without synchronizing. `T` matches the operator's data type, `params` is
+  `(numParams, batchSize)` and `storage` is `(batchSize,)`. Write the coefficient values
+  into `storage`.
+- `gradient`: Optional gradient function, `g(time, params, scalar_grad, params_grad)` on
+  the CPU, or `g(time, params, scalar_grad, params_grad, stream)` on the GPU. It
+  accumulates (`+=`) into `params_grad[i, b]`; see the callbacks guide in the docs for
+  the convention.
+- `device`: `:cpu` (`CUDENSITYMAT_CALLBACK_DEVICE_CPU`) or `:gpu`
+  (`CUDENSITYMAT_CALLBACK_DEVICE_GPU`); applies to both `f` and `gradient`.
 
 # Returns
 - `cb::cudensitymatWrappedScalarCallback_t` — the callback struct
@@ -390,93 +633,105 @@ function my_coeff(time, params, storage)
         storage[i] = complex(cos(ω * time), sin(ω * time))
     end
 end
-
 cb, gcb, refs = wrap_scalar_callback(my_coeff)
+
+# The same on the GPU
+function cis_kernel!(storage, params, t)
+    i = threadIdx().x
+    i <= length(storage) && (storage[i] = cis(params[1, i] * t))
+    return
+end
+gpu_coeff(t, params, storage, stream) =
+    @cuda threads=length(storage) stream=stream cis_kernel!(storage, params, t)
+cb, gcb, refs = wrap_scalar_callback(gpu_coeff; device=:gpu)
 ```
 """
-function wrap_scalar_callback(f::Function; gradient::Union{Nothing,Function} = nothing)
-    # Ensure wrappers are initialized
+function wrap_scalar_callback(
+    f::Function;
+    gradient::Union{Nothing,Function} = nothing,
+    device::Symbol = :cpu,
+)
+    dev = _callback_device(device)
     if _cpu_scalar_wrapper_ptr[] == C_NULL
         _init_callback_wrappers!()
     end
+    gpu = dev == CUDENSITYMAT_CALLBACK_DEVICE_GPU
 
     id = _register_callback(f)
-
     cb = cudensitymatWrappedScalarCallback_t(
         Ptr{Cvoid}(id),                      # callback = our ID
-        CUDENSITYMAT_CALLBACK_DEVICE_CPU,     # device
-        _cpu_scalar_wrapper_ptr[],             # wrapper = our trampoline
+        dev,
+        gpu ? _gpu_scalar_wrapper_ptr[] : _cpu_scalar_wrapper_ptr[],
     )
 
-    gcb = if gradient !== nothing
-        grad_id = _register_callback(gradient)
+    grad_id = gradient === nothing ? nothing : _register_callback(gradient)
+    gcb = if grad_id === nothing
+        NULL_SCALAR_GRADIENT_CALLBACK
+    else
         cudensitymatWrappedScalarGradientCallback_t(
             Ptr{Cvoid}(grad_id),
-            CUDENSITYMAT_CALLBACK_DEVICE_CPU,
-            _cpu_scalar_gradient_wrapper_ptr[],
+            dev,
+            gpu ? _gpu_scalar_gradient_wrapper_ptr[] : _cpu_scalar_gradient_wrapper_ptr[],
             CUDENSITYMAT_DIFFERENTIATION_DIR_BACKWARD,
         )
-    else
-        NULL_SCALAR_GRADIENT_CALLBACK
     end
 
     # Return refs to prevent accidental unregistration
-    refs = (
-        id = id,
-        grad_id = (gradient !== nothing ? grad_id : nothing),
-        f = f,
-        gradient = gradient,
-    )
+    refs = (id = id, grad_id = grad_id, f = f, gradient = gradient)
     return cb, gcb, refs
 end
 
 """
-    wrap_tensor_callback(f; gradient=nothing) -> (cb, gcb, refs)
+    wrap_tensor_callback(f; gradient=nothing, device=:cpu) -> (cb, gcb, refs)
 
 Wrap a Julia function as a tensor callback for time-dependent operator elements.
 
 # Arguments
-- `f`: Function with signature `f(time::Float64, params::Matrix{Float64}, storage::Array{T})`
-  where `storage` shape is `(d1, d2, ..., d1, d2, ..., batchSize)` for dense operators.
+- `f`: `f(time::Float64, params::Matrix{Float64}, storage::Array{T})` for `device = :cpu`,
+  or `f(time, params::CuDeviceMatrix{Float64}, storage::CuDeviceArray{T}, stream::CuStream)`
+  for `device = :gpu` (enqueue kernels on `stream`, don't synchronize). `storage` has
+  shape `(d1, d2, ..., d1, d2, ..., batchSize)` for dense operators.
   Write the tensor elements into `storage`.
-- `gradient`: Optional gradient function.
+- `gradient`: Optional gradient function, `g(time, params, tensor_grad, params_grad)`
+  (CPU) or `g(time, params, tensor_grad, params_grad, stream)` (GPU).
+- `device`: `:cpu` or `:gpu`, see [`wrap_scalar_callback`](@ref).
 
 # Returns
 - `cb::cudensitymatWrappedTensorCallback_t`
 - `gcb::cudensitymatWrappedTensorGradientCallback_t`
 - `refs` — opaque reference holder
 """
-function wrap_tensor_callback(f::Function; gradient::Union{Nothing,Function} = nothing)
+function wrap_tensor_callback(
+    f::Function;
+    gradient::Union{Nothing,Function} = nothing,
+    device::Symbol = :cpu,
+)
+    dev = _callback_device(device)
     if _cpu_tensor_wrapper_ptr[] == C_NULL
         _init_callback_wrappers!()
     end
+    gpu = dev == CUDENSITYMAT_CALLBACK_DEVICE_GPU
 
     id = _register_callback(f)
-
     cb = cudensitymatWrappedTensorCallback_t(
         Ptr{Cvoid}(id),
-        CUDENSITYMAT_CALLBACK_DEVICE_CPU,
-        _cpu_tensor_wrapper_ptr[],
+        dev,
+        gpu ? _gpu_tensor_wrapper_ptr[] : _cpu_tensor_wrapper_ptr[],
     )
 
-    gcb = if gradient !== nothing
-        grad_id = _register_callback(gradient)
+    grad_id = gradient === nothing ? nothing : _register_callback(gradient)
+    gcb = if grad_id === nothing
+        NULL_TENSOR_GRADIENT_CALLBACK
+    else
         cudensitymatWrappedTensorGradientCallback_t(
             Ptr{Cvoid}(grad_id),
-            CUDENSITYMAT_CALLBACK_DEVICE_CPU,
-            _cpu_tensor_gradient_wrapper_ptr[],
+            dev,
+            gpu ? _gpu_tensor_gradient_wrapper_ptr[] : _cpu_tensor_gradient_wrapper_ptr[],
             CUDENSITYMAT_DIFFERENTIATION_DIR_BACKWARD,
         )
-    else
-        NULL_TENSOR_GRADIENT_CALLBACK
     end
 
-    refs = (
-        id = id,
-        grad_id = (gradient !== nothing ? grad_id : nothing),
-        f = f,
-        gradient = gradient,
-    )
+    refs = (id = id, grad_id = grad_id, f = f, gradient = gradient)
     return cb, gcb, refs
 end
 

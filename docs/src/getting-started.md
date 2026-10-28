@@ -10,7 +10,15 @@ Pkg.add(url="https://github.com/harmoniqs/CuQuantum.jl")
 ```
 
 !!! note "GPU Required"
-    CuQuantum.jl requires a CUDA-capable GPU at runtime. The package will load without a GPU, but all computation functions require one. Supported architectures: Turing (T4), Ampere (A100), Ada (L4/L40), Hopper (H100), Blackwell (B200).
+    CuQuantum.jl requires a CUDA-capable GPU of compute capability 7.5 or newer at runtime: Turing (T4), Ampere (A100), Ada (L4/L40), Hopper (H100), Blackwell (B200). The package loads without a GPU, and `CuDensityMat.version()` works wherever the library can be loaded, but all computation functions need a supported GPU.
+
+## Versions
+
+CuQuantum.jl targets cuDensityMat 0.7 (cuQuantum 26.9, via `cuQuantum_jll` 26.9) and
+CUDA.jl 6.5, in lockstep with the `cuStateVec`/`cuTensorNet` packages that ship with
+CUDA.jl 6.5. The low-level bindings are generated from the cuDensityMat header with
+`gen/generate.jl`; `CuDensityMat.MIN_LIBRARY_VERSION` is the oldest library whose ABI
+they match.
 
 ## Dependencies
 

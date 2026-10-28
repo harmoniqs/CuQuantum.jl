@@ -104,6 +104,50 @@ function my_gradient(
 !!! warning "Accumulation semantics"
     `params_grad` uses **+=** semantics — always add to it, never overwrite. The library may call the gradient callback multiple times for different terms that share parameters. The library handles the Wirtinger derivative convention internally — your callback should accumulate ``\text{Re}(\text{scalar\_grad} \cdot \partial f / \partial \theta)``, not ``2\,\text{Re}(\cdots)``.
 
+## GPU Callbacks
+
+By default callbacks run on the host (`CUDENSITYMAT_CALLBACK_DEVICE_CPU`): the library
+copies parameters and coefficient/tensor storage to host memory around each call. Pass
+`device=:gpu` to register a GPU callback (`CUDENSITYMAT_CALLBACK_DEVICE_GPU`) instead.
+A GPU callback is still invoked on the host, but receives **device** buffers as
+`CuDeviceArray`s and the library's CUDA stream as a `CuStream`, and is expected to
+enqueue CUDA.jl kernels on that stream and return without synchronizing:
+
+```julia
+function cis_kernel!(storage, params, t)
+    i = threadIdx().x
+    if i <= length(storage)
+        @inbounds storage[i] = cis(params[1, i] * t)
+    end
+    return
+end
+
+function gpu_coeff(time, params, storage, stream)
+    @cuda threads=length(storage) stream=stream cis_kernel!(storage, params, time)
+    return nothing
+end
+
+cb, gcb, refs = wrap_scalar_callback(gpu_coeff; device=:gpu)
+```
+
+| | CPU callback | GPU callback |
+|:---|:---|:---|
+| scalar | `f(t, params::Matrix, storage::Vector)` | `f(t, params::CuDeviceMatrix, storage::CuDeviceVector, stream)` |
+| tensor | `f(t, params, storage::Array)` | `f(t, params, storage::CuDeviceArray, stream)` |
+| scalar gradient | `g(t, params, scalar_grad, params_grad)` | `g(t, params, scalar_grad, params_grad, stream)` |
+| tensor gradient | `g(t, params, tensor_grad, params_grad)` | `g(t, params, tensor_grad, params_grad, stream)` |
+
+The `device` keyword applies to both the callback and its `gradient`.
+
+!!! note "Streams and memory"
+    When the library calls back on the task's stream (the stream every high-level
+    function passes), `stream` is CUDA.jl's own `CuStream`. Any other stream is wrapped
+    with `unsafe_wrap(CuStream, handle)`, which CUDA.jl doesn't own: kernels taking
+    `CuDeviceArray`s (as above) can be launched on it, but `CuArray` operations
+    (broadcasts, copies) can't. To use `CuArray`s, order work between the borrowed
+    stream and the task's stream with `CuEvent`s, as described in the docstring of
+    `unsafe_wrap(CuStream, ...)`.
+
 ## GC Safety
 
 Callbacks are registered in a global dictionary to prevent garbage collection while the cuDensityMat library holds function pointers. Always unregister after you're done:

@@ -24,7 +24,7 @@ cuDensityMat also supports **native batching** — many density matrices evolved
 ## Features
 
 - **Lindblad master equation** — time-dependent Hamiltonians with dissipation
-- **Time-dependent callbacks** — CPU scalar and tensor callbacks for driven systems
+- **Time-dependent callbacks** — scalar and tensor callbacks on the CPU or the GPU (CUDA.jl kernels on the library's stream)
 - **Backward differentiation** — parameter gradients via VJP (single-GPU)
 - **Native batching** — parallel evolution of many states with different parameters
 - **Expectation values** — $\text{Tr}(O\rho)$ for arbitrary operators
@@ -38,7 +38,10 @@ using Pkg
 Pkg.add(url="https://github.com/harmoniqs/CuQuantum.jl")
 ```
 
-Requires a CUDA-capable GPU (Turing or newer) and Julia 1.10+.
+Requires a CUDA-capable GPU (Turing or newer, compute capability ≥ 7.5) and Julia 1.10+.
+Targets cuDensityMat 0.7 (`cuQuantum_jll` 26.9) and CUDA.jl 6.5. The full 0.7 C API
+(including MPS/MPO, TDVP/Krylov time propagation, DMRG eigensolvers, and state fitting) is
+available as generated low-level bindings (`CuDensityMat.cudensitymat*`).
 
 ## Benchmarks
 
@@ -127,7 +130,7 @@ $$\mathcal{L}[\rho] = -i[H, \rho] + \gamma \sum_m \left( a_m \rho a_m^\dagger - 
 |:---|:---|
 | Julia | 1.12.5 |
 | CUDA.jl | 5.8.x |
-| cuQuantum SDK (JLL) | 25.11.0 |
+| cuQuantum SDK (JLL) | 25.11.0 (benchmarks predate the 26.9 / cuDensityMat 0.7 port) |
 | QuantumToolbox.jl | latest |
 | QuTiP | 5.2.3 |
 | JAX | 0.6.2 |

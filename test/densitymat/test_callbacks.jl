@@ -8,7 +8,7 @@
 
     # ---- Scalar callback wrapping ----
 
-    @gpu_test "wrap scalar callback" begin
+    @testset "wrap scalar callback" begin
         # Simple callback: f(t) = exp(iΩt) where Ω=1
         function my_coeff(time, params, storage)
             for i in eachindex(storage)
@@ -25,7 +25,7 @@
         CuDensityMat.unregister_callback!(refs)
     end
 
-    @gpu_test "wrap scalar callback with gradient" begin
+    @testset "wrap scalar callback with gradient" begin
         function my_coeff(time, params, storage)
             for i in eachindex(storage)
                 storage[i] = complex(cos(time), sin(time))
@@ -47,7 +47,7 @@
 
     # ---- Tensor callback wrapping ----
 
-    @gpu_test "wrap tensor callback" begin
+    @testset "wrap tensor callback" begin
         function my_tensor(time, params, storage)
             # Fill with rotation matrix: [[cos(t), -sin(t)], [sin(t), cos(t)]]
             # Column-major: storage[1]=cos(t), storage[2]=sin(t), storage[3]=-sin(t), storage[4]=cos(t)
@@ -66,7 +66,7 @@
 
     # ---- Callback registry ----
 
-    @gpu_test "callback registry lifecycle" begin
+    @testset "callback registry lifecycle" begin
         f1(t, p, s) = nothing
         f2(t, p, s) = nothing
 
