@@ -23,11 +23,14 @@ they match.
 ## Dependencies
 
 CuQuantum.jl depends on:
-- [CUDA.jl](https://github.com/JuliaGPU/CUDA.jl) — Julia GPU computing
+- [CUDACore](https://github.com/JuliaGPU/CUDA.jl) — the core of CUDA.jl (arrays, streams,
+  kernels), like the library packages CUDA.jl 6 ships (`cuStateVec`, `cuTensorNet`, …)
 - [cuQuantum_jll](https://github.com/JuliaBinaryWrappers/cuQuantum_jll.jl) — prebuilt cuQuantum SDK binaries
 - [CEnum.jl](https://github.com/JuliaInterop/CEnum.jl) — C enum support
 
-All dependencies are installed automatically.
+All dependencies are installed automatically. `CuArray` and `CuVector` are CUDACore types,
+so the examples' `using CUDA` (which re-exports CUDACore) works if CUDA.jl is in your
+environment; `using CUDACore` is enough otherwise.
 
 ## Verify Installation
 

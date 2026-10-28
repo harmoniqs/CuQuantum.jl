@@ -75,7 +75,7 @@ function prepare_expectation!(
         compute_type,
         Csize_t(mem_limit),
         ws.workspace,
-        CUDA.stream().handle,
+        CUDACore.stream().handle,
     )
     required = workspace_query_size(ws)
     if required > 0
@@ -98,14 +98,14 @@ function compute_expectation!(
     ws::WorkStream,
     expectation::Expectation,
     state::AbstractState,
-    result::CUDA.CuArray;
+    result::CUDACore.CuArray;
     time::Real = 0.0,
     batch_size::Integer = state.batch_size,
     num_params::Integer = 0,
-    params::Union{Nothing,CUDA.CuVector{Float64}} = nothing,
+    params::Union{Nothing,CUDACore.CuVector{Float64}} = nothing,
 )
     _check_valid(ws)
-    params_ptr = params === nothing ? CUDA.CU_NULL : pointer(params)
+    params_ptr = params === nothing ? CUDACore.CU_NULL : pointer(params)
     cudensitymatExpectationCompute(
         ws.handle,
         expectation.handle,
@@ -116,8 +116,8 @@ function compute_expectation!(
         state.handle,
         pointer(result),
         ws.workspace,
-        CUDA.stream().handle,
+        CUDACore.stream().handle,
     )
-    CUDA.synchronize()
+    CUDACore.synchronize()
     return nothing
 end

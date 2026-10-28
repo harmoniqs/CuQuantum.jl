@@ -161,7 +161,7 @@ function prepare_spectrum!(
         compute_type,
         Csize_t(mem_limit),
         ws.workspace,
-        CUDA.stream().handle,
+        CUDACore.stream().handle,
     )
     required = workspace_query_size(ws)
     if required > 0
@@ -195,11 +195,11 @@ function compute_spectrum!(
     spectrum::OperatorSpectrum,
     num_eigenstates::Integer,
     eigenstates::AbstractVector{<:AbstractState{T}},
-    eigenvalues::CUDA.CuArray;
+    eigenvalues::CUDACore.CuArray;
     time::Real = 0.0,
     batch_size::Integer = 1,
     num_params::Integer = 0,
-    params::Union{Nothing,CUDA.CuVector{Float64}} = nothing,
+    params::Union{Nothing,CUDACore.CuVector{Float64}} = nothing,
     tolerances::AbstractVector{<:Real} = fill(
         sqrt(eps(Float64)),
         Int(num_eigenstates) * Int(batch_size),
@@ -221,7 +221,7 @@ function compute_spectrum!(
             "tolerances has $(length(tolerances)) elements, need $(num_eigenstates * batch_size)",
         ),
     )
-    params_ptr = params === nothing ? CUDA.CU_NULL : pointer(params)
+    params_ptr = params === nothing ? CUDACore.CU_NULL : pointer(params)
     state_handles = cudensitymatState_t[s.handle for s in eigenstates]
     residuals = Float64.(tolerances)
 
@@ -237,8 +237,8 @@ function compute_spectrum!(
         pointer(eigenvalues),
         residuals,
         ws.workspace,
-        CUDA.stream().handle,
+        CUDACore.stream().handle,
     )
-    CUDA.synchronize()
+    CUDACore.synchronize()
     return residuals
 end

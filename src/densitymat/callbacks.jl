@@ -374,7 +374,7 @@ end
 #   tensor gradient: g(time, params, tensor_grad::CuDeviceArray{T}, params_grad, stream)
 # =============================================================================
 
-const _AS_Global = CUDA.CUDACore.AS.Global
+const _AS_Global = CUDACore.AS.Global
 
 function _device_array(::Type{T}, ptr::Ptr, dims::Dims{N}) where {T,N}
     return CuDeviceArray{T,N,_AS_Global}(reinterpret(Core.LLVMPtr{T,_AS_Global}, ptr), dims)
@@ -383,8 +383,8 @@ end
 # The library passes the stream it was given (normally the task's stream, which
 # CUDA.jl owns), or a stream CUDA.jl doesn't know about, or the NULL stream.
 function _callback_stream(handle::CUstream)
-    handle == C_NULL && return CUDA.default_stream()
-    task_stream = CUDA.stream()
+    handle == C_NULL && return CUDACore.default_stream()
+    task_stream = CUDACore.stream()
     task_stream.handle == handle && return task_stream
     return unsafe_wrap(CuStream, handle)
 end

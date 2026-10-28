@@ -12,26 +12,26 @@ A workspace context bundling a CuDensityMat library handle, workspace descriptor
 and CUDA stream. All CuDensityMat operations require a `WorkStream`.
 
 # Keyword Arguments
-- `stream::Union{Nothing, CUDA.CuStream}`: CUDA stream. Uses the default stream if `nothing`.
+- `stream::Union{Nothing, CUDACore.CuStream}`: CUDA stream. Uses the default stream if `nothing`.
 - `memory_limit::Union{Nothing, Int}`: Maximum workspace memory in bytes. Default is unlimited.
 - `device_id::Union{Nothing, Int}`: CUDA device ordinal. Uses current device if `nothing`.
 
 # Examples
 ```julia
 ws = WorkStream()                          # default stream, current device
-ws = WorkStream(stream=CUDA.CuStream())    # explicit stream
+ws = WorkStream(stream=CUDACore.CuStream())    # explicit stream
 close(ws)                                  # release resources
 ```
 """
 mutable struct WorkStream
     handle::cudensitymatHandle_t
     workspace::cudensitymatWorkspaceDescriptor_t
-    stream::CUDA.CuStream
+    stream::CUDACore.CuStream
     device_id::Int
     memory_limit::Union{Nothing,Int}
 
     # Workspace buffer (managed CuVector for scratch space)
-    workspace_buffer::Union{Nothing,CUDA.CuVector{UInt8}}
+    workspace_buffer::Union{Nothing,CUDACore.CuVector{UInt8}}
     workspace_size::Int
 
     # Communicator state
@@ -41,18 +41,18 @@ mutable struct WorkStream
     _comm_ref::Any
 
     function WorkStream(;
-        stream::Union{Nothing,CUDA.CuStream} = nothing,
+        stream::Union{Nothing,CUDACore.CuStream} = nothing,
         memory_limit::Union{Nothing,Int} = nothing,
         device_id::Union{Nothing,Int} = nothing,
     )
         dev = if device_id !== nothing
-            CUDA.device!(device_id)
+            CUDACore.device!(device_id)
             device_id
         else
-            CUDA.device().handle
+            CUDACore.device().handle
         end
 
-        s = stream !== nothing ? stream : CUDA.default_stream()
+        s = stream !== nothing ? stream : CUDACore.default_stream()
 
         # Create library handle
         h = create()
@@ -88,7 +88,7 @@ function _destroy!(ws::WorkStream)
     if ws.workspace != C_NULL
         # Free workspace buffer first
         if ws.workspace_buffer !== nothing
-            CUDA.unsafe_free!(ws.workspace_buffer)
+            CUDACore.unsafe_free!(ws.workspace_buffer)
             ws.workspace_buffer = nothing
         end
         cudensitymatDestroyWorkspace(ws.workspace)
@@ -256,13 +256,13 @@ function workspace_allocate!(
 
     # Free existing buffer if too small
     if ws.workspace_buffer !== nothing && length(ws.workspace_buffer) < size
-        CUDA.unsafe_free!(ws.workspace_buffer)
+        CUDACore.unsafe_free!(ws.workspace_buffer)
         ws.workspace_buffer = nothing
     end
 
     # Allocate if needed
     if ws.workspace_buffer === nothing
-        ws.workspace_buffer = CUDA.CuVector{UInt8}(undef, size)
+        ws.workspace_buffer = CUDACore.CuVector{UInt8}(undef, size)
     end
     ws.workspace_size = size
 
@@ -289,7 +289,7 @@ function release_workspace!(ws::WorkStream)
 
     # Free buffer
     if ws.workspace_buffer !== nothing
-        CUDA.unsafe_free!(ws.workspace_buffer)
+        CUDACore.unsafe_free!(ws.workspace_buffer)
         ws.workspace_buffer = nothing
     end
     ws.workspace_size = 0

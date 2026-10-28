@@ -9,16 +9,16 @@ Part of the CuQuantum.jl package. Targets cuDensityMat 0.7 (cuQuantum 26.9).
 """
 module CuDensityMat
 
-using CUDA
-using CUDA: CuPtr, PtrOrCuPtr, unsafe_free!, HandleCache
-using CUDA.CUDACore: CUstream, cudaDataType, libraryPropertyType
-using CUDA.CUDACore: retry_reclaim, initialize_context
-using CUDA.CUDACore: @checked, @gcsafe_ccall
-using CUDA.CUDACore: R_32F, R_64F, C_32F, C_64F, cuDoubleComplex
+using CUDACore
+using CUDACore: CuPtr, PtrOrCuPtr, unsafe_free!, HandleCache
+using CUDACore: CUstream, cudaDataType, libraryPropertyType
+using CUDACore: retry_reclaim, initialize_context
+using CUDACore: @checked, @gcsafe_ccall
+using CUDACore: R_32F, R_64F, C_32F, C_64F, cuDoubleComplex
 
 using CEnum: @cenum
 
-const _local_toolkit = CUDA.CUDACore.local_toolkit
+const _local_toolkit = CUDACore.local_toolkit
 if _local_toolkit
     using CUDA_Runtime_Discovery
 else
@@ -68,7 +68,7 @@ include("spectrum.jl")
 
 # Per-context handle cache following CUDA.jl pattern
 const _handle_cache =
-    HandleCache{CUDA.CuContext,cudensitymatHandle_t}((_) -> create(), (_, h) -> destroy(h))
+    HandleCache{CUDACore.CuContext,cudensitymatHandle_t}((_) -> create(), (_, h) -> destroy(h))
 
 """
     handle() -> cudensitymatHandle_t
@@ -77,7 +77,7 @@ Get a cuDensityMat library handle for the current CUDA context.
 Handles are cached per-context and reused.
 """
 function handle()
-    ctx = CUDA.context()
+    ctx = CUDACore.context()
     return pop!(_handle_cache, ctx)
 end
 
@@ -87,7 +87,7 @@ end
 Return a handle to the cache for reuse.
 """
 function release_handle(h::cudensitymatHandle_t)
-    ctx = CUDA.context()
+    ctx = CUDACore.context()
     push!(_handle_cache, ctx, h)
 end
 
@@ -122,7 +122,7 @@ function __init__()
     else
         if !cuQuantum_jll.is_available()
             precompiling ||
-                !CUDA.functional() ||
+                !CUDACore.functional() ||
                 @error "cuQuantum is not available for your platform ($(Base.BinaryPlatforms.triplet(cuQuantum_jll.host_platform)))"
             return
         end
@@ -135,7 +135,7 @@ function __init__()
         return
     end
 
-    _functional[] = CUDA.functional()
+    _functional[] = CUDACore.functional()
 end
 
 end # module CuDensityMat
