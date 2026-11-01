@@ -447,11 +447,16 @@ end
     append_elementary_product_batch!(term, elem_operators, modes_acted_on,
         mode_action_duality, batch_size, static_coefficients; kwargs...)
 
-Append a batched tensor product of elementary operators to the term.
+Append a batched tensor product of elementary operators to the term: batch member `b`
+gets coefficient `static_coefficients[b] * f(t, params[:, b])` for a
+`coefficient_callback` `f`.
 
 # Arguments
 - `static_coefficients`: GPU array of ComplexF64 coefficients (length batch_size)
-- `total_coefficients`: GPU storage for total coefficients, or `nothing`
+- `total_coefficients`: GPU storage (length batch_size) for the total coefficients.
+  cuDensityMat only allows it to be NULL when there is no coefficient callback; if a
+  callback is given and this is `nothing`, a buffer is allocated. All coefficient
+  buffers are kept alive with the term/operator (the library holds their pointers).
 """
 function append_elementary_product_batch!(
     term::OperatorTerm,
@@ -467,6 +472,9 @@ function append_elementary_product_batch!(
     handles = cudensitymatElementaryOperator_t[op.handle for op in elem_operators]
     modes = Int32[m for m in modes_acted_on]
     duality = Int32[d for d in mode_action_duality]
+    if total_coefficients === nothing && coefficient_callback.callback != C_NULL
+        total_coefficients = CUDACore.zeros(ComplexF64, batch_size)
+    end
     total_ptr =
         total_coefficients === nothing ? CUDACore.CU_NULL : pointer(total_coefficients)
 
@@ -485,6 +493,7 @@ function append_elementary_product_batch!(
     )
 
     append!(term._elem_op_refs, elem_operators)
+    push!(term._callback_refs, (static_coefficients, total_coefficients))
     return nothing
 end
 
@@ -588,6 +597,11 @@ end
 
 Append an operator term to the composite operator.
 
+The coefficient (static × `coefficient_callback`) is a non-batched quantity: on batched
+states cuDensityMat calls the callback with batch size 1 and `params[:, 1]` only, and
+uses that value for every batch member. For per-member coefficients use
+[`append_term_batch!`](@ref).
+
 # Arguments
 - `duality`: 0 for ket-side (default), nonzero for bra-side
 - `coefficient`: Static complex scalar coefficient (default: 1.0+0im)
@@ -618,11 +632,16 @@ end
     append_term_batch!(operator, term, batch_size, static_coefficients;
         duality=0, kwargs...)
 
-Append a batched operator term.
+Append a batched operator term: batch member `b` gets coefficient
+`static_coefficients[b] * f(t, params[:, b])` for a `coefficient_callback` `f`. Use this,
+not [`append_term!`](@ref), when the coefficient must differ per batch member.
 
 # Arguments
 - `static_coefficients`: GPU array of ComplexF64 coefficients (length batch_size)
-- `total_coefficients`: GPU storage for total coefficients, or `nothing`
+- `total_coefficients`: GPU storage (length batch_size) for the total coefficients.
+  cuDensityMat only allows it to be NULL when there is no coefficient callback; if a
+  callback is given and this is `nothing`, a buffer is allocated. All coefficient
+  buffers are kept alive with the term/operator (the library holds their pointers).
 """
 function append_term_batch!(
     op::Operator,
@@ -634,6 +653,9 @@ function append_term_batch!(
     coefficient_callback::cudensitymatWrappedScalarCallback_t = NULL_SCALAR_CALLBACK,
     coefficient_gradient_callback::cudensitymatWrappedScalarGradientCallback_t = NULL_SCALAR_GRADIENT_CALLBACK,
 )
+    if total_coefficients === nothing && coefficient_callback.callback != C_NULL
+        total_coefficients = CUDACore.zeros(ComplexF64, batch_size)
+    end
     total_ptr =
         total_coefficients === nothing ? CUDACore.CU_NULL : pointer(total_coefficients)
     cudensitymatOperatorAppendTermBatch(
@@ -647,7 +669,7 @@ function append_term_batch!(
         coefficient_callback,
         coefficient_gradient_callback,
     )
-    push!(op._term_refs, (term, static_coefficients, batch_size))
+    push!(op._term_refs, (term, static_coefficients, total_coefficients, batch_size))
     op._action_prepared = false
     return nothing
 end
@@ -956,27 +978,32 @@ Compute backward differentiation (the VJP) of a single-operator action
 
 # Gradient convention
 
-Adjoints are full real gradients, `∂L/∂Re z + i ∂L/∂Im z` (the ChainRules/Zygote
-convention for complex arrays). For a real cost `L(ρ_out)` pass
-`state_out_adj = ∂L/∂Re ρ_out + i ∂L/∂Im ρ_out`; locally this is the cost
-`L = Re⟨state_out_adj, ρ_out⟩ = Re Tr(state_out_adjᴴ ρ_out)`. Then:
+Adjoints are *holomorphic-side* gradients, `∂L/∂Re z − i ∂L/∂Im z` (= `2 ∂L/∂z`),
+the elementwise **conjugate** of the ChainRules/Zygote cotangent `∂L/∂Re z + i ∂L/∂Im z`.
+For a real cost `L(ρ_out)` pass `state_out_adj = ∂L/∂Re ρ_out − i ∂L/∂Im ρ_out`; locally
+this is the bilinear cost `L = Re Σᵢⱼ state_out_adjᵢⱼ ρ_out,ᵢⱼ = Re Tr(state_out_adjᵀ ρ_out)`
+(the seed is *not* conjugated). Then:
 
-- `state_in_adj += A(θ)ᴴ state_out_adj`, the same kind of gradient with respect to `ρ_in`
+- `state_in_adj += A(θ)ᵀ state_out_adj`, the same kind of gradient with respect to `ρ_in`
   (chain it into the previous step's `state_out_adj`);
 - every gradient callback receives the holomorphic adjoint of its quantity `Q` (scalar
-  coefficient or operator tensor), `∂⟨state_out_adj, ρ_out⟩/∂Q` — unconjugated, and for
-  a scalar callback including the static coefficient it multiplies — and must
-  accumulate `params_grad[n] += Re(Σ adjoint .* ∂Q/∂θ[n])`, with **no factor 2**.
+  coefficient or operator tensor), `∂(Σ state_out_adj ∘ ρ_out)/∂Q` — for a scalar
+  callback this includes the static coefficient it multiplies — and must accumulate
+  `params_grad[n] += Re(Σ adjoint .* ∂Q/∂θ[n])`, with **no factor 2**.
 
-The cuDensityMat header documents `2·Re(...)`: that is the same number for a Wirtinger
-seed `state_out_adj = ∂L/∂ρ_out*`, which is half of the seed above. Both conventions
-are pinned against finite differences, with factor-2 and conjugation negative controls,
-in `test/densitymat/test_gradients.jl`.
+To use a ChainRules cotangent `ρ̄`, pass `conj.(ρ̄)` and conjugate the returned
+`state_in_adj`; `params_grad` needs no change.
+
+The cuDensityMat header documents `2·Re(...)`: that is the same number for the Wirtinger
+seed `state_out_adj = ∂L/∂ρ_out`, half of the seed above. The convention was measured on
+an A10 (libcudensitymat 0.7.0) and is pinned against finite differences of the GPU forward
+action, with factor-2, conjugation and conjugated-seed negative controls, in
+`test/densitymat/test_gradients.jl`.
 
 # Arguments
 - `state_in`: Forward-pass input state
-- `state_out_adj`: Adjoint of the forward-pass output, `∂L/∂Re ρ_out + i ∂L/∂Im ρ_out`
-- `state_in_adj`: Output — receives `∂L/∂Re ρ_in + i ∂L/∂Im ρ_in` (accumulated, += semantics)
+- `state_out_adj`: Adjoint of the forward-pass output, `∂L/∂Re ρ_out − i ∂L/∂Im ρ_out`
+- `state_in_adj`: Output — receives `∂L/∂Re ρ_in − i ∂L/∂Im ρ_in` (accumulated, += semantics)
 - `params_grad`: GPU vector — receives the parameter gradients from the gradient
   callbacks (accumulated, += semantics; zero it before the first call)
 """

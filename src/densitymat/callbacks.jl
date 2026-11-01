@@ -614,7 +614,7 @@ Wrap a Julia function as a scalar callback for time-dependent coefficients.
   into `storage`.
 - `gradient`: Optional gradient function, `g(time, params, scalar_grad, params_grad)` on
   the CPU, or `g(time, params, scalar_grad, params_grad, stream)` on the GPU.
-  `scalar_grad[b]` is the (unconjugated) adjoint of the coefficient `f`, input only;
+  `scalar_grad[b]` is the holomorphic adjoint of the coefficient `f`, input only;
   the function accumulates `params_grad[i, b] += real(scalar_grad[b] * ∂f[b]/∂params[i, b])`
   — `Re`, with no factor 2, in the gradient convention of
   [`compute_operator_action_backward!`](@ref).
@@ -696,7 +696,7 @@ Wrap a Julia function as a tensor callback for time-dependent operator elements.
   Write the tensor elements into `storage`.
 - `gradient`: Optional gradient function, `g(time, params, tensor_grad, params_grad)`
   (CPU) or `g(time, params, tensor_grad, params_grad, stream)` (GPU). `tensor_grad` has
-  the shape of `storage` and holds the (unconjugated) adjoint of the tensor; the function
+  the shape of `storage` and holds the holomorphic adjoint of the tensor; the function
   accumulates `params_grad[i, b] += real(sum(tensor_grad[.., b] .* ∂storage[.., b]/∂params[i, b]))`
   — `Re`, no factor 2, see [`compute_operator_action_backward!`](@ref).
 - `device`: `:cpu` or `:gpu`, see [`wrap_scalar_callback`](@ref).

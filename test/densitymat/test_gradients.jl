@@ -4,25 +4,34 @@
 # prepare_backward, compute_backward, parameter gradients.
 # Single-GPU only (no MPI backward diff support yet from NVIDIA).
 #
-# Gradient convention (pinned below; see `compute_operator_action_backward!`):
+# Gradient convention (measured on an A10 against finite differences of the library's
+# own forward action; see `compute_operator_action_backward!`):
 #
-# Seeding `state_out_adj = a` defines the real cost  c = Re⟨a, ρ_out⟩ = Re Tr(a† ρ_out).
-# The library then returns
-#   state_in_adj  += A^H a            (= ∂c/∂Re ρ_in + i ∂c/∂Im ρ_in)
-# and passes each gradient callback the adjoint of its quantity Q,
-#   scalar_grad    = ⟨a, ∂ρ_out/∂Q⟩  (no conjugation; includes static coefficients),
-#   tensor_grad[k] = ∂/∂U[k] of ⟨a, ρ_out⟩ (holomorphic derivative),
-# so a callback must accumulate  params_grad[n] += Re(scalar_grad * ∂Q/∂θ_n),
-# with NO factor 2. The header's "2·Re" is the same number written for a Wirtinger
-# seed a = ∂c/∂ρ_out* (half of ours): 2·Re(⟨a/2, ·⟩ ∂Q/∂θ) = Re(⟨a, ·⟩ ∂Q/∂θ).
+# Seeding `state_out_adj = a` defines the real cost
+#     c = Re Σᵢⱼ aᵢⱼ ρ_out,ᵢⱼ = Re Tr(aᵀ ρ_out)          (bilinear — a is NOT conjugated)
+# i.e. a = ∂c/∂Re ρ_out − i ∂c/∂Im ρ_out (= 2 ∂c/∂ρ_out, the elementwise conjugate of
+# the ChainRules/Zygote cotangent). The library then returns
+#   state_in_adj  += Aᵀ a             (same convention, w.r.t. ρ_in)
+# and passes each gradient callback the holomorphic adjoint of its quantity Q,
+#   scalar_grad    = ∂(Σ a∘ρ_out)/∂Q  (includes the static coefficient),
+#   tensor_grad    = a ρ_inᵀ for a single-mode ket-side operator,
+# so a callback accumulates  params_grad[n] += Re(scalar_grad * ∂Q/∂θ_n), with NO
+# factor 2. The header's "2·Re" is the same number for the Wirtinger seed ∂c/∂ρ_out
+# (half of a).
 #
-# Every FD test here has an analytic dense-CPU oracle too, and a negative control:
-# the fixtures are chosen so that 2·Re, conj(scalar_grad) and dropping the static
-# coefficient each miss the oracle by far more than the tolerance (checked on the
-# CPU in "gradient convention oracle (CPU)").
+# Every GPU gradient test has an analytic dense-CPU oracle, an FD oracle computed from
+# the GPU forward action, and negative controls: the fixtures are chosen so that 2·Re,
+# conj(scalar_grad), dropping the static coefficient and the conjugated-seed cost
+# Re⟨a, ρ_out⟩ = Re Tr(a†ρ_out) each miss by far more than the tolerance (checked on the
+# CPU in "gradient convention oracle (CPU)"). Earlier fixtures used Hermitian seeds and
+# real diagonal operators, for which Re Tr(aᵀ X) = Re Tr(a† X), so they could not see
+# the seed conjugation.
 
 const _σz = ComplexF64[1 0; 0 -1]
 const _σx = ComplexF64[0 1; 1 0]
+
+# The library's local cost for a seed `a` and an output `ρ_out` (host arrays).
+_lib_cost(a, out) = real(sum(a .* out))
 
 # Fixture for the convention tests: a generic complex operator B, a Hermitian input
 # state, a non-Hermitian adjoint seed, a complex static coefficient and the angle θ
@@ -34,25 +43,40 @@ const CONV_a = ComplexF64[0.3+0.5im 0.1+0.4im; -0.2+0.8im 0.3]
 const CONV_c0 = 0.6 + 0.3im
 const CONV_θ = 0.4
 
-# Cost of the dense CPU model, c(θ) = Re⟨a, c0·Q(θ)·B ρ⟩ (ket-side action).
-_conv_cost(θ) = real(dot(CONV_a, CONV_c0 * cis(θ) * CONV_B * CONV_ρ))
-# Holomorphic adjoint of the callback coefficient, ⟨a, c0·B ρ⟩.
-const CONV_w = CONV_c0 * dot(CONV_a, CONV_B * CONV_ρ)
+# Cost of the dense CPU model, c(θ) = Re Σ a∘(c0·Q(θ)·B ρ) (ket-side action).
+_conv_cost(θ) = _lib_cost(CONV_a, CONV_c0 * cis(θ) * CONV_B * CONV_ρ)
+# Holomorphic adjoint of the callback coefficient Q: c0·Σ a∘(B ρ).
+const CONV_w = CONV_c0 * sum(CONV_a .* (CONV_B * CONV_ρ))
 # dc/dθ under the Re convention.
 const CONV_grad = real(CONV_w * im * cis(CONV_θ))
+# What the conjugated-seed model (cost Re⟨a, ρ_out⟩) would predict — the assumption
+# the first GPU run refuted.
+const CONV_w_conjseed = CONV_c0 * dot(CONV_a, CONV_B * CONV_ρ)
 
 # Tensor-callback fixture: U(θ) = exp(-iθσx) = cosθ·I - i sinθ·σx.
 _conv_U(θ) = cos(θ) * I - im * sin(θ) * _σx
 _conv_dU(θ) = -sin(θ) * I - im * cos(θ) * _σx
-_conv_tensor_cost(θ) = real(dot(CONV_a, _conv_U(θ) * CONV_ρ))
-# Holomorphic adjoint of U: tensor_grad[i,k] = Σ_j conj(a[i,j]) ρ[k,j].
-const CONV_tensor_adj = conj(CONV_a) * transpose(CONV_ρ)
+_conv_tensor_cost(θ) = _lib_cost(CONV_a, _conv_U(θ) * CONV_ρ)
+# Holomorphic adjoint of U: tensor_grad[i,k] = Σ_j a[i,j] ρ[k,j] = (a ρᵀ)[i,k].
+const CONV_tensor_adj = CONV_a * transpose(CONV_ρ)
 const CONV_tensor_grad = real(sum(CONV_tensor_adj .* _conv_dU(CONV_θ)))
 
 _central_diff(f, x; ε = 1e-5) = (f(x + ε) - f(x - ε)) / (2ε)
 
+# Gradient of a real function of a complex matrix in the library's seed convention,
+# ∂f/∂Re X − i ∂f/∂Im X, by central differences.
+function _seed_gradient(f, X)
+    map(CartesianIndices(X)) do k
+        e = zeros(ComplexF64, size(X))
+        e[k] = 1
+        _central_diff(t -> f(X + t * e), 0.0) -
+        im * _central_diff(t -> f(X + im * t * e), 0.0)
+    end
+end
+
 # One forward + backward pass of the single-mode operator `c0 · Q · term` on 2×2
-# mixed states; returns (ρ_out, params_grad, state_in_adj) as host arrays.
+# mixed states. Returns (ρ_out, params_grad, state_in_adj, fd), where `fd` is the
+# central difference of the library cost evaluated through the GPU forward action.
 function _backward_pass(ws, operator, ρ, a, θ; time = 0.0)
     T = ComplexF64
     rho_in = DenseMixedState{T}(ws, (2,); batch_size = 1)
@@ -99,7 +123,7 @@ function _backward_pass(ws, operator, ρ, a, θ; time = 0.0)
             num_params = 1,
             params = CUDA.CuVector{Float64}([θ′]),
         )
-        real(dot(vec(a), Array(rho_out.storage)))
+        _lib_cost(vec(a), Array(rho_out.storage))
     end
     out = reshape(Array(rho_out.storage), 2, 2)
     fd = _central_diff(cost, θ)
@@ -125,31 +149,30 @@ end
             two_re = 2 * CONV_grad,
             conjugated = real(conj(CONV_w) * im * cis(CONV_θ)),
             no_static_coefficient = real(CONV_w / CONV_c0 * im * cis(CONV_θ)),
+            conjugated_seed = real(CONV_w_conjseed * im * cis(CONV_θ)),
         )
         for (name, g) in pairs(wrong_scalar)
-            @test abs(g - CONV_grad) > 0.5 * abs(CONV_grad)
+            @test abs(g - CONV_grad) > 0.25 * abs(CONV_grad) # ≫ the 1e-8 GPU tolerance
         end
         @test abs(imag(CONV_w)) > 0.1 # scalar_grad ≠ conj(scalar_grad)
         conj_tensor = real(sum(conj(CONV_tensor_adj) .* _conv_dU(CONV_θ)))
-        @test abs(conj_tensor - CONV_tensor_grad) > 0.5 * abs(CONV_tensor_grad)
-        @test abs(2 * CONV_tensor_grad - CONV_tensor_grad) > 0.5 * abs(CONV_tensor_grad)
-        # state_in_adj = A^H a is the full real gradient of c w.r.t. ρ_in.
-        A = CONV_c0 * cis(CONV_θ) * CONV_B
-        cost_in(ρ) = real(dot(CONV_a, A * ρ))
-        fd_adj = map(CartesianIndices(CONV_ρ)) do k
-            e = zeros(ComplexF64, 2, 2)
-            e[k] = 1
-            _central_diff(t -> cost_in(CONV_ρ + t * e), 0.0) +
-            im * _central_diff(t -> cost_in(CONV_ρ + im * t * e), 0.0)
+        conjseed_tensor = real(sum((conj(CONV_a) * transpose(CONV_ρ)) .* _conv_dU(CONV_θ)))
+        for g in (conj_tensor, conjseed_tensor, 2 * CONV_tensor_grad)
+            @test abs(g - CONV_tensor_grad) > 0.25 * abs(CONV_tensor_grad)
         end
-        @test fd_adj ≈ A' * CONV_a rtol = 1e-9
+        # state_in_adj = Aᵀ a is the seed-convention gradient of c w.r.t. ρ_in,
+        # and differs from the conjugated-seed answer A^H a.
+        A = CONV_c0 * cis(CONV_θ) * CONV_B
+        fd_adj = _seed_gradient(ρ -> _lib_cost(CONV_a, A * ρ), CONV_ρ)
+        @test fd_adj ≈ transpose(A) * CONV_a rtol = 1e-9
+        @test !isapprox(transpose(A) * CONV_a, A' * CONV_a; rtol = 0.1)
     end
 
     # =========================================================================
     # Test 1: the scalar adjoint handed to the gradient callback (pins conjugation)
     # =========================================================================
 
-    @gpu_test "scalar_grad is the unconjugated adjoint ⟨a, ∂ρ_out/∂Q⟩" begin
+    @gpu_test "scalar_grad is the holomorphic adjoint ∂(Σ a∘ρ_out)/∂Q" begin
         ws = WorkStream()
         dims = [2]
         T = ComplexF64
@@ -184,14 +207,16 @@ end
         # the adjoint passed to the callback: includes c0, not conjugated
         @test length(captured) == 1
         @test captured[1] ≈ CONV_w rtol = 1e-12
-        @test !isapprox(captured[1], conj(CONV_w); rtol = 0.1)        # negative control
-        @test !isapprox(captured[1], CONV_w / CONV_c0; rtol = 0.1)    # negative control
-        # params_grad: analytic oracle, FD oracle, and the factor-2 negative control
-        @test g ≈ CONV_grad rtol = 1e-12
+        @test !isapprox(captured[1], conj(CONV_w); rtol = 0.1)          # negative control
+        @test !isapprox(captured[1], CONV_w / CONV_c0; rtol = 0.1)      # negative control
+        @test !isapprox(captured[1], CONV_w_conjseed; rtol = 0.1)       # negative control
+        # params_grad: FD through the GPU forward, analytic oracle, factor-2 control
         @test g ≈ fd rtol = 1e-8
+        @test g ≈ CONV_grad rtol = 1e-12
         @test !isapprox(2g, fd; rtol = 0.1)
-        # state_in_adj = A^H a
-        @test adj ≈ A' * CONV_a rtol = 1e-12
+        # state_in_adj = Aᵀ a (not A^H a)
+        @test adj ≈ transpose(A) * CONV_a rtol = 1e-12
+        @test !isapprox(adj, A' * CONV_a; rtol = 0.1)                   # negative control
 
         CuDensityMat.unregister_callback!(cb_refs)
         close(ws)
@@ -236,11 +261,12 @@ end
         @test out ≈ U * CONV_ρ rtol = 1e-12
         @test length(captured) == 1
         @test captured[1][:, :, 1] ≈ CONV_tensor_adj rtol = 1e-12
-        @test g ≈ CONV_tensor_grad rtol = 1e-12
         @test g ≈ fd rtol = 1e-8
-        @test !isapprox(2g, fd; rtol = 0.1)                                    # negative control
+        @test g ≈ CONV_tensor_grad rtol = 1e-12
+        @test !isapprox(2g, fd; rtol = 0.1)                                      # negative control
         @test !isapprox(captured[1][:, :, 1], conj(CONV_tensor_adj); rtol = 0.1) # negative control
-        @test adj ≈ U' * CONV_a rtol = 1e-12
+        @test adj ≈ transpose(U) * CONV_a rtol = 1e-12
+        @test !isapprox(adj, U' * CONV_a; rtol = 0.1)                            # negative control
 
         CuDensityMat.unregister_callback!(refs)
         close(ws)
@@ -248,6 +274,11 @@ end
 
     # =========================================================================
     # Test 1c: batched backward pass — params_grad[n, b] per batch member
+    #
+    # A coefficient callback on a term appended with `append_term!` is a NON-batched
+    # quantity: cuDensityMat calls it with batch size 1 (params[:, 1] only) and
+    # replicates the value along the batch. Per-member coefficients need
+    # `append_term_batch!`. Both behaviours are pinned here.
     # =========================================================================
 
     @gpu_test "batched params_grad: one gradient per batch member" begin
@@ -255,68 +286,118 @@ end
         dims = [2]
         T = ComplexF64
         nb = 2
+        θs = [CONV_θ, -1.3]
+        ρs = (CONV_ρ, ComplexF64[0.25 0.1im; -0.1im 0.75])
+        as = (CONV_a, ComplexF64[0.2 -0.6im; 0.5+0.1im 0.8im])
         elem =
             CuDensityMat.create_elementary_operator(ws, [2], CUDA.CuVector{T}(vec(CONV_B)))
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
+        seen_batch = Int[]
         cb, gcb, refs = CuDensityMat.wrap_scalar_callback(
-            (t, p, s) -> (s .= cis.(p[1, :]); nothing);
+            (t, p, s) -> (push!(seen_batch, length(s)); s .= cis.(p[1, :]); nothing);
             gradient = (t, p, sg, pg) ->
                 (pg[1, :] .+= real.(sg .* im .* cis.(p[1, :])); nothing),
         )
-        operator = CuDensityMat.create_operator(ws, dims)
-        CuDensityMat.append_term!(
-            operator,
-            term;
-            coefficient = CONV_c0,
-            coefficient_callback = cb,
-            coefficient_gradient_callback = gcb,
-        )
-        θs = [CONV_θ, -1.3]
-        ρs = (CONV_ρ, ComplexF64[0.25 0.1im; -0.1im 0.75])
-        as = (CONV_a, ComplexF64[0.2 -0.6im; 0.5+0.1im 0.8im])
-        rho_in = DenseMixedState{T}(ws, (2,); batch_size = nb)
-        rho_out = DenseMixedState{T}(ws, (2,); batch_size = nb)
-        rho_out_adj = DenseMixedState{T}(ws, (2,); batch_size = nb)
-        rho_in_adj = DenseMixedState{T}(ws, (2,); batch_size = nb)
-        foreach(CuDensityMat.allocate_storage!, (rho_in, rho_out, rho_out_adj, rho_in_adj))
-        copyto!(rho_in.storage, CUDA.CuVector{T}(reduce(vcat, vec.(ρs))))
-        copyto!(rho_out_adj.storage, CUDA.CuVector{T}(reduce(vcat, vec.(as))))
-        params = CUDA.CuVector{Float64}(θs)            # (numParams = 1, batchSize = 2)
-        CuDensityMat.prepare_operator_action!(ws, operator, rho_in, rho_out)
-        CuDensityMat.initialize_zero!(rho_out)
-        CuDensityMat.compute_operator_action!(
-            ws,
-            operator,
-            rho_in,
-            rho_out;
-            num_params = 1,
-            params,
-        )
-        CuDensityMat.prepare_operator_action_backward!(ws, operator, rho_in, rho_out_adj)
-        CuDensityMat.initialize_zero!(rho_in_adj)
-        params_grad = CUDA.zeros(Float64, nb)
-        CuDensityMat.compute_operator_action_backward!(
-            ws,
-            operator,
-            rho_in,
-            rho_out_adj,
-            rho_in_adj,
-            params_grad;
-            num_params = 1,
-            params,
-        )
-        out = reshape(Array(rho_out.storage), 2, 2, nb)
-        g = Array(params_grad)
+        function run(batched::Bool)
+            empty!(seen_batch)
+            operator = CuDensityMat.create_operator(ws, dims)
+            if batched
+                CuDensityMat.append_term_batch!(
+                    operator,
+                    term,
+                    nb,
+                    CUDA.CuVector{ComplexF64}(fill(CONV_c0, nb));
+                    coefficient_callback = cb,
+                    coefficient_gradient_callback = gcb,
+                )
+            else
+                CuDensityMat.append_term!(
+                    operator,
+                    term;
+                    coefficient = CONV_c0,
+                    coefficient_callback = cb,
+                    coefficient_gradient_callback = gcb,
+                )
+            end
+            rho_in = DenseMixedState{T}(ws, (2,); batch_size = nb)
+            rho_out = DenseMixedState{T}(ws, (2,); batch_size = nb)
+            rho_out_adj = DenseMixedState{T}(ws, (2,); batch_size = nb)
+            rho_in_adj = DenseMixedState{T}(ws, (2,); batch_size = nb)
+            foreach(
+                CuDensityMat.allocate_storage!,
+                (rho_in, rho_out, rho_out_adj, rho_in_adj),
+            )
+            copyto!(rho_in.storage, CUDA.CuVector{T}(reduce(vcat, vec.(ρs))))
+            copyto!(rho_out_adj.storage, CUDA.CuVector{T}(reduce(vcat, vec.(as))))
+            params = CUDA.CuVector{Float64}(θs)        # (numParams = 1, batchSize = 2)
+            forward(p) = begin
+                CuDensityMat.initialize_zero!(rho_out)
+                CuDensityMat.compute_operator_action!(
+                    ws,
+                    operator,
+                    rho_in,
+                    rho_out;
+                    num_params = 1,
+                    params = p,
+                )
+                reshape(Array(rho_out.storage), 2, 2, nb)
+            end
+            CuDensityMat.prepare_operator_action!(ws, operator, rho_in, rho_out)
+            out = forward(params)
+            CuDensityMat.prepare_operator_action_backward!(
+                ws,
+                operator,
+                rho_in,
+                rho_out_adj,
+            )
+            CuDensityMat.initialize_zero!(rho_in_adj)
+            params_grad = CUDA.zeros(Float64, nb)
+            CuDensityMat.compute_operator_action_backward!(
+                ws,
+                operator,
+                rho_in,
+                rho_out_adj,
+                rho_in_adj,
+                params_grad;
+                num_params = 1,
+                params,
+            )
+            # FD of each member's cost through the GPU forward, perturbing θ_b only
+            fd = map(1:nb) do b
+                cost(t) = begin
+                    θp = copy(θs)
+                    θp[b] = t
+                    _lib_cost(as[b], forward(CUDA.CuVector{Float64}(θp))[:, :, b])
+                end
+                _central_diff(cost, θs[b])
+            end
+            return out, Array(params_grad), fd, copy(seen_batch)
+        end
+
+        # Batched coefficients: each member uses its own θ_b.
+        out, g, fd, seen = run(true)
+        @test all(==(nb), seen)
         for b = 1:nb
             A = CONV_c0 * cis(θs[b]) * CONV_B
             @test out[:, :, b] ≈ A * ρs[b] rtol = 1e-12
-            analytic = real(CONV_c0 * dot(as[b], CONV_B * ρs[b]) * im * cis(θs[b]))
+            analytic = real(CONV_c0 * sum(as[b] .* (CONV_B * ρs[b])) * im * cis(θs[b]))
             @test abs(analytic) > 0.05
+            @test g[b] ≈ fd[b] rtol = 1e-8
             @test g[b] ≈ analytic rtol = 1e-12
         end
-        # negative control: the batch members are not swapped or summed
-        @test !isapprox(g, reverse(g); rtol = 0.1)
+        @test !isapprox(g, reverse(g); rtol = 0.1) # members not swapped or summed
+
+        # Non-batched term on batched states: the callback sees batch size 1 and
+        # member 1's parameters, replicated (not a binding bug — cuDensityMat 0.7
+        # semantics, see `append_term!`).
+        out1, _, _, seen1 = run(false)
+        @test all(==(1), seen1)
+        for b = 1:nb
+            @test out1[:, :, b] ≈ CONV_c0 * cis(θs[1]) * CONV_B * ρs[b] rtol = 1e-12
+        end
+        @test !isapprox(out1[:, :, 2], CONV_c0 * cis(θs[2]) * CONV_B * ρs[2]; rtol = 0.1)
+
         CuDensityMat.unregister_callback!(refs)
         close(ws)
     end
@@ -326,7 +407,7 @@ end
     #
     # Operator: A(θ) = θ * σ_z  (ket-side only, duality=0)
     # Forward: ρ_out = θ * σ_z * ρ_in
-    # Cost: c(θ) = Re(Tr(ρ_out_adj† * ρ_out)) = Re(⟨ρ_out_adj, ρ_out⟩)
+    # Cost: c(θ) = Re Σ ρ_out_adj ∘ ρ_out = Re Tr(ρ_out_adjᵀ ρ_out)  (library convention)
     # ∂c/∂θ via finite differences vs backward
     # =========================================================================
 
@@ -399,8 +480,8 @@ end
         )
         rho_out_result = Array(rho_out.storage)
 
-        # Cost = Re(dot(rho_out_adj, rho_out)) = Re(Σ conj(adj_i) * out_i)
-        cost_at_θ₀ = real(dot(rho_out_adj_data, rho_out_result))
+        # Library cost for the seed: Re Σ adj_i * out_i (adj not conjugated)
+        cost_at_θ₀ = _lib_cost(rho_out_adj_data, rho_out_result)
 
         # --- Backward pass ---
         rho_out_adj = DenseMixedState{T}(ws, (2,); batch_size = 1)
@@ -445,13 +526,13 @@ end
                 params = p,
             )
             out = Array(rho_out.storage)
-            return real(dot(rho_out_adj_data, out))
+            return _lib_cost(rho_out_adj_data, out)
         end
         fd_grad = (cost_at(θ₀ + ε) - cost_at(θ₀ - ε)) / (2ε)
 
         # c(θ) = θ·Re⟨a, σz ρ⟩ is linear in θ, so central differences are exact up to
         # roundoff (~1e-16/ε): 1e-8 is ~100× the noise, 1e-4 was ~10⁶×.
-        analytic = real(dot(rho_out_adj_data, vec(_σz * reshape(rho_in_data, 2, 2))))
+        analytic = _lib_cost(rho_out_adj_data, vec(_σz * reshape(rho_in_data, 2, 2)))
         @test abs(analytic) > 0.1
         @test backward_grad ≈ analytic rtol = 1e-12
         @test backward_grad ≈ fd_grad rtol = 1e-8
@@ -464,7 +545,7 @@ end
     # =========================================================================
     # Test 3: Finite-difference verification of state_in_adj
     #
-    # Verify that state_in_adj = A(θ)^H * state_out_adj by comparing
+    # Verify that state_in_adj = A(θ)ᵀ * state_out_adj by comparing
     # each element against finite differences on the cost.
     # =========================================================================
 
@@ -575,7 +656,7 @@ end
                     params = params_vec,
                 )
                 out_plus = Array(rho_out.storage)
-                cost_plus = real(dot(rho_out_adj_data, out_plus))
+                cost_plus = _lib_cost(rho_out_adj_data, out_plus)
 
                 perturbed = copy(rho_in_data)
                 perturbed[idx] -= complex(δ_re, δ_im)
@@ -592,13 +673,13 @@ end
                     params = params_vec,
                 )
                 out_minus = Array(rho_out.storage)
-                cost_minus = real(dot(rho_out_adj_data, out_minus))
+                cost_minus = _lib_cost(rho_out_adj_data, out_minus)
 
                 dc = (cost_plus - cost_minus) / (2ε)
                 if δ_re > 0
                     fd_adj[idx] += dc      # real part of adjoint
                 else
-                    fd_adj[idx] += dc * im  # imaginary part of adjoint
+                    fd_adj[idx] -= dc * im  # seed convention: ∂c/∂Re − i ∂c/∂Im
                 end
             end
         end
@@ -606,11 +687,8 @@ end
         # Restore original state
         copyto!(rho_in.storage, CUDA.CuVector{T}(rho_in_data))
 
-        # The backward state_in_adj should be conjugated relative to the
-        # Wirtinger derivative: state_in_adj = conj(∂c/∂rho_in*)
-        # For a linear operator, state_in_adj = A^H * rho_out_adj
-        # Exact oracle: A^H a with A = θ σz (ket side).
-        exact_adj = vec((θ₀ * _σz)' * reshape(rho_out_adj_data, 2, 2))
+        # Exact oracle: Aᵀ a with A = θ σz (ket side).
+        exact_adj = vec(transpose(θ₀ * _σz) * reshape(rho_out_adj_data, 2, 2))
         @test backward_adj ≈ exact_adj rtol = 1e-12
         # FD oracle: cost is linear in ρ_in, so the error is roundoff ~eps/ε ≈ 2e-9.
         for idx = 1:(D*D)
@@ -769,7 +847,7 @@ end
                 params = p,
             )
             out = Array(rho_out.storage)
-            return real(dot(rho_out_adj_data, out))
+            return _lib_cost(rho_out_adj_data, out)
         end
 
         for n = 1:num_params
@@ -783,7 +861,7 @@ end
         end
         ρm = reshape(rho_in_data, 2, 2)
         am = reshape(rho_out_adj_data, 2, 2)
-        analytic = [real(dot(am, _σz * ρm)), real(dot(am, _σx * ρm))]
+        analytic = [_lib_cost(am, _σz * ρm), _lib_cost(am, _σx * ρm)]
         @test all(abs.(analytic) .> 0.05)
         @test backward_grads ≈ analytic rtol = 1e-12
 
@@ -909,7 +987,7 @@ end
                 params = p,
             )
             out = Array(rho_out.storage)
-            return real(dot(rho_out_adj_data, out))
+            return _lib_cost(rho_out_adj_data, out)
         end
         fd_grad = (cost_at(Ω₀ + ε) - cost_at(Ω₀ - ε)) / (2ε)
 
@@ -983,8 +1061,8 @@ end
         # both runs against the analytic oracle, not just each other
         a = ComplexF64[1.0 0.2-0.1im; 0.2+0.1im 0.5]
         ρ = ComplexF64[0.7 0.3im; -0.3im 0.3]
-        @test g_ref[1] ≈ real(dot(a, _σz * ρ)) rtol = 1e-12
-        @test adj_ref ≈ vec((1.5 * _σz)' * a) rtol = 1e-12
+        @test g_ref[1] ≈ _lib_cost(a, _σz * ρ) rtol = 1e-12
+        @test adj_ref ≈ vec(transpose(1.5 * _σz) * a) rtol = 1e-12
     end
 
     # Note: backward diff without callbacks/params is not supported by the C API

@@ -105,11 +105,15 @@ julia = "1.10"
    the 12 are the MPI/NCCL testsets, skipped because the runner has a single GPU
    and no MPI.jl. The MPI paths are still untested against 0.7. The test audit that
    followed (gradient-convention oracles, dense-CPU reference for the Lindblad
-   integration test, tightened tolerances) needs one more GPU run before the PR.
-   Note for upstream: the gradient-callback convention here is `Re(...)` with no
-   factor 2 for `state_out_adj` seeded as `∂L/∂Re ρ + i ∂L/∂Im ρ`; the header's
-   `2·Re(...)` is the same number for a Wirtinger seed `∂L/∂ρ*` (see
-   `compute_operator_action_backward!`).
+   integration test, tightened tolerances) was then run on the A10 as well; see the
+   s0-test-audit report for the receipts.
+   Note for upstream: measured on 0.7.0, the backward seed is bilinear — the local
+   cost is `Re Σ state_out_adj ∘ ρ_out`, i.e. `state_out_adj = ∂L/∂Re ρ − i ∂L/∂Im ρ`
+   (the conjugate of a ChainRules cotangent) and `state_in_adj = Aᵀ state_out_adj`.
+   Gradient callbacks then accumulate `Re(...)` with no factor 2; the header's
+   `2·Re(...)` is the same number for the Wirtinger seed `∂L/∂ρ` (see
+   `compute_operator_action_backward!`). A ChainRules rule must conjugate the
+   cotangent going in and `state_in_adj` coming out.
 2. Decide what upstream gets: just the generated layer plus a thin `wrappers.jl`
    (what `cuStateVec` started with), or the high-level API too.
 3. Agree on the package name (`cuDensityMat`, following `cuStateVec` /
