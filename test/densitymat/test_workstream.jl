@@ -43,16 +43,21 @@
             h
         end
         GC.gc(true)
-        # Can't directly assert the handle was destroyed, but no crash = success
-        @test true
+        # Can't directly assert the handle was destroyed; no crash, and a fresh
+        # WorkStream is still created after the finalizer ran
+        ws2 = WorkStream()
+        @test isopen(ws2)
+        close(ws2)
     end
 
     @gpu_test "random seed" begin
         ws = WorkStream()
-        # Setting random seed should not error
-        CuDensityMat.set_random_seed!(ws, 42)
-        CuDensityMat.set_random_seed!(ws, 0)
-        CuDensityMat.set_random_seed!(ws, typemax(Int32))
+        # Setting random seed should not error (previously this testset had no
+        # assertion at all and was reported with 0 tests)
+        for seed in (42, 0, typemax(Int32))
+            @test CuDensityMat.set_random_seed!(ws, seed) === nothing
+        end
+        @test isopen(ws)
         close(ws)
     end
 
@@ -75,8 +80,8 @@
         v = CuDensityMat.version()
         @test v isa VersionNumber
         @test v.major >= 0
-        # The version should be reasonable (cuQuantum SDK 24.x or 25.x)
-        @test v.major >= 24 || v.major == 0  # 0 for dev builds
+        # libcudensitymat's own version (0.7.x with cuQuantum_jll 26.9), not the SDK's
+        @test v >= v"0.7.0"
     end
 
 end

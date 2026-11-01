@@ -58,7 +58,41 @@
             h
         end
         GC.gc(true)
-        @test true  # no crash
+        @test isopen(ws)  # no crash, WorkStream still usable after the finalizer
+        close(ws)
+    end
+
+    # Batch layout: operator data is (d, d, batch) in F-order and batch member b acts
+    # on state b (σz on |+⟩, σx on |0⟩ — swapping the members changes the result).
+    @gpu_test "batched elementary operator acts per batch member" begin
+        T = ComplexF64
+        ws = WorkStream()
+        dims = [2]
+        σz = T[1 0; 0 -1]
+        σx = T[0 1; 1 0]
+        elem = CuDensityMat.create_elementary_operator_batch(
+            ws,
+            [2],
+            CUDA.CuVector{T}([vec(σz); vec(σx)]),
+            2,
+        )
+        term = CuDensityMat.create_operator_term(ws, dims)
+        CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
+        op = CuDensityMat.create_operator(ws, dims)
+        CuDensityMat.append_term!(op, term; duality = 0)
+        ψin = DensePureState{T}(ws, (2,); batch_size = 2)
+        ψout = DensePureState{T}(ws, (2,); batch_size = 2)
+        CuDensityMat.allocate_storage!(ψin)
+        CuDensityMat.allocate_storage!(ψout)
+        ψ = (T[1, 1] / sqrt(2), T[1, 0])
+        copyto!(ψin.storage, CUDA.CuVector{T}([ψ[1]; ψ[2]]))
+        CuDensityMat.prepare_operator_action!(ws, op, ψin, ψout)
+        CuDensityMat.initialize_zero!(ψout)
+        CuDensityMat.compute_operator_action!(ws, op, ψin, ψout)
+        out = reshape(Array(ψout.storage), 2, 2)
+        @test out[:, 1] ≈ σz * ψ[1] rtol = 1e-12
+        @test out[:, 2] ≈ σx * ψ[2] rtol = 1e-12
+        @test !isapprox(out[:, 1], σx * ψ[1]; rtol = 0.1) # negative control
         close(ws)
     end
 
@@ -137,7 +171,7 @@
             @test op.handle != C_NULL
         end
         GC.gc(true)
-        @test true
+        @test isopen(ws)
         close(ws)
     end
 

@@ -120,6 +120,7 @@ end
             CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_SMALLEST_REAL,
         )
         @test real(λ) ≈ minimum(SPECTRUM_DIAG) atol = 1e-6
+        @test abs(imag(λ)) < 1e-8
         @test abs(ψ[1]) ≈ 1 atol = 1e-6
         @test residuals[1] < 1e-6
     end
