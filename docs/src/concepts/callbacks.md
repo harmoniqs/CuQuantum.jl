@@ -102,7 +102,7 @@ function my_gradient(
 ```
 
 !!! warning "Accumulation semantics"
-    `params_grad` uses **+=** semantics — always add to it, never overwrite. The library may call the gradient callback multiple times for different terms that share parameters. The library handles the Wirtinger derivative convention internally — your callback should accumulate ``\text{Re}(\text{scalar\_grad} \cdot \partial f / \partial \theta)``, not ``2\,\text{Re}(\cdots)``.
+    `params_grad` uses **+=** semantics — always add to it, never overwrite. The library may call the gradient callback multiple times for different terms that share parameters. Accumulate ``\text{Re}(\text{scalar\_grad} \cdot \partial f / \partial \theta)``, not ``2\,\text{Re}(\cdots)``: CuQuantum.jl seeds `state_out_adj` with the full real gradient ``\partial c/\partial \operatorname{Re}\rho + i\,\partial c/\partial \operatorname{Im}\rho`` (the ChainRules convention), which is twice the Wirtinger seed ``\partial c/\partial \rho^*`` that the cuDensityMat header's ``2\,\text{Re}`` assumes. `scalar_grad` is not conjugated, so for a complex Jacobian (e.g. ``f = e^{i\Omega t}``) multiply by ``\partial f/\partial\theta`` itself, not its conjugate. See `compute_operator_action_backward!` for the full convention; `test/densitymat/test_gradients.jl` pins it against finite differences.
 
 ## GPU Callbacks
 

@@ -71,6 +71,6 @@ CuQuantum.jl supports parameter gradients via the cuDensityMat backward differen
 \frac{\partial c}{\partial \theta_n} \mathrel{+}= \text{Re}\!\left(\frac{\partial c}{\partial Q_j} \cdot \frac{\partial Q_j}{\partial \theta_n}\right)
 ```
 
-where ``Q_j`` are the differentiable quantities (coefficients, operator elements) and ``\theta_n`` are real parameters. The library computes ``\partial c / \partial Q_j`` via tensor contraction and handles the Wirtinger derivative convention. The user's gradient callback provides ``\partial Q_j / \partial \theta_n`` and accumulates into the parameter gradient vector.
+where ``Q_j`` are the differentiable quantities (coefficients, operator elements) and ``\theta_n`` are real parameters. The library computes the (unconjugated) adjoint ``\partial c / \partial Q_j`` via tensor contraction; the user's gradient callback multiplies it by ``\partial Q_j / \partial \theta_n`` and accumulates the real part — no factor 2, because `state_out_adj` is seeded with the full real gradient ``\partial c/\partial \operatorname{Re}\rho + i\,\partial c/\partial \operatorname{Im}\rho`` rather than the Wirtinger ``\partial c/\partial\rho^*`` that the cuDensityMat header's ``2\,\text{Re}`` refers to.
 
 See [Callbacks](@ref "Time-Dependent Callbacks") for how to set up gradient callbacks.

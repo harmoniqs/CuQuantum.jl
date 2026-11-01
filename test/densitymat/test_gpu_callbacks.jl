@@ -347,8 +347,10 @@ host_ptr(a) = reinterpret(Ptr{Cvoid}, pointer(a))
         gpu_cb, gpu_gcb, gpu_refs =
             CuDensityMat.wrap_scalar_callback(gpu_cis_coefficient; device = :gpu)
         expected = run(cpu_cb, cpu_gcb)
-        @test any(!iszero, expected)
-        @test run(gpu_cb, gpu_gcb) ≈ expected
+        # dense oracle: cis(ω t)·σz ρ with ω t = 1, ρ = |+⟩⟨+|
+        ρ = fill(0.5 + 0im, 2, 2)
+        @test expected ≈ vec(cis(1.0) * ComplexF64[1 0; 0 -1] * ρ) rtol = 1e-12
+        @test run(gpu_cb, gpu_gcb) ≈ expected rtol = 1e-12
         CuDensityMat.unregister_callback!(cpu_refs)
         CuDensityMat.unregister_callback!(gpu_refs)
     end
@@ -396,8 +398,10 @@ host_ptr(a) = reinterpret(Ptr{Cvoid}, pointer(a))
         c1, g1, r1 = CuDensityMat.wrap_tensor_callback(cpu_rotation)
         c2, g2, r2 = CuDensityMat.wrap_tensor_callback(gpu_rotation; device = :gpu)
         expected = run(c1, g1)
-        @test any(!iszero, expected)
-        @test run(c2, g2) ≈ expected
+        # dense oracle: R(0.3)·|0⟩⟨0|
+        R = ComplexF64[cos(0.3) -sin(0.3); sin(0.3) cos(0.3)]
+        @test expected ≈ vec(R * ComplexF64[1 0; 0 0]) rtol = 1e-12
+        @test run(c2, g2) ≈ expected rtol = 1e-12
         CuDensityMat.unregister_callback!(r1)
         CuDensityMat.unregister_callback!(r2)
     end
@@ -461,7 +465,10 @@ host_ptr(a) = reinterpret(Ptr{Cvoid}, pointer(a))
             device = :gpu,
         )
         expected = run(c1, g1)
-        @test run(c2, g2) ≈ expected
+        # analytic oracle: scalar_grad = ⟨|0⟩⟨0|, σz ρ⟩ = 1/2, so
+        # dc/dω = Re(1/2 · i t cis(ω t)) = -sin(1)/4 at t = 0.5, ω = 2 (no factor 2)
+        @test expected[1] ≈ -sin(1.0) / 4 rtol = 1e-12
+        @test run(c2, g2) ≈ expected rtol = 1e-12
         CuDensityMat.unregister_callback!(r1)
         CuDensityMat.unregister_callback!(r2)
     end

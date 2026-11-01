@@ -906,7 +906,8 @@ state, which is congruent to the forward output by construction.
 
 # Arguments
 - `state_in`: The forward-pass input state
-- `state_out_adj`: The adjoint of the forward-pass output state (∂L/∂state_out)
+- `state_out_adj`: The adjoint of the forward-pass output state, in the convention of
+  [`compute_operator_action_backward!`](@ref)
 """
 function prepare_operator_action_backward!(
     ws::WorkStream,
@@ -948,16 +949,34 @@ end
         state_in_adj, params_grad; time=0.0, batch_size=state_in.batch_size,
         num_params=0, params=nothing)
 
-Compute backward differentiation of a single-operator action.
+Compute backward differentiation (the VJP) of a single-operator action
+`ρ_out = A(θ) ρ_in`.
 
-Computes ∂L/∂state_in (into `state_in_adj`) and ∂L/∂params (into `params_grad`)
-given ∂L/∂state_out (`state_out_adj`).
+# Gradient convention
+
+Adjoints are full real gradients, `∂L/∂Re z + i ∂L/∂Im z` (the ChainRules/Zygote
+convention for complex arrays). For a real cost `L(ρ_out)` pass
+`state_out_adj = ∂L/∂Re ρ_out + i ∂L/∂Im ρ_out`; locally this is the cost
+`L = Re⟨state_out_adj, ρ_out⟩ = Re Tr(state_out_adjᴴ ρ_out)`. Then:
+
+- `state_in_adj += A(θ)ᴴ state_out_adj`, the same kind of gradient with respect to `ρ_in`
+  (chain it into the previous step's `state_out_adj`);
+- every gradient callback receives the holomorphic adjoint of its quantity `Q` (scalar
+  coefficient or operator tensor), `∂⟨state_out_adj, ρ_out⟩/∂Q` — unconjugated, and for
+  a scalar callback including the static coefficient it multiplies — and must
+  accumulate `params_grad[n] += Re(Σ adjoint .* ∂Q/∂θ[n])`, with **no factor 2**.
+
+The cuDensityMat header documents `2·Re(...)`: that is the same number for a Wirtinger
+seed `state_out_adj = ∂L/∂ρ_out*`, which is half of the seed above. Both conventions
+are pinned against finite differences, with factor-2 and conjugation negative controls,
+in `test/densitymat/test_gradients.jl`.
 
 # Arguments
 - `state_in`: Forward-pass input state
-- `state_out_adj`: Adjoint of forward-pass output (∂L/∂state_out)
-- `state_in_adj`: Output — receives ∂L/∂state_in (accumulated, += semantics)
-- `params_grad`: GPU vector — receives ∂L/∂params (accumulated, += semantics)
+- `state_out_adj`: Adjoint of the forward-pass output, `∂L/∂Re ρ_out + i ∂L/∂Im ρ_out`
+- `state_in_adj`: Output — receives `∂L/∂Re ρ_in + i ∂L/∂Im ρ_in` (accumulated, += semantics)
+- `params_grad`: GPU vector — receives the parameter gradients from the gradient
+  callbacks (accumulated, += semantics; zero it before the first call)
 """
 function compute_operator_action_backward!(
     ws::WorkStream,

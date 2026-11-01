@@ -613,9 +613,11 @@ Wrap a Julia function as a scalar callback for time-dependent coefficients.
   `(numParams, batchSize)` and `storage` is `(batchSize,)`. Write the coefficient values
   into `storage`.
 - `gradient`: Optional gradient function, `g(time, params, scalar_grad, params_grad)` on
-  the CPU, or `g(time, params, scalar_grad, params_grad, stream)` on the GPU. It
-  accumulates (`+=`) into `params_grad[i, b]`; see the callbacks guide in the docs for
-  the convention.
+  the CPU, or `g(time, params, scalar_grad, params_grad, stream)` on the GPU.
+  `scalar_grad[b]` is the (unconjugated) adjoint of the coefficient `f`, input only;
+  the function accumulates `params_grad[i, b] += real(scalar_grad[b] * ∂f[b]/∂params[i, b])`
+  — `Re`, with no factor 2, in the gradient convention of
+  [`compute_operator_action_backward!`](@ref).
 - `device`: `:cpu` (`CUDENSITYMAT_CALLBACK_DEVICE_CPU`) or `:gpu`
   (`CUDENSITYMAT_CALLBACK_DEVICE_GPU`); applies to both `f` and `gradient`.
 
@@ -693,7 +695,10 @@ Wrap a Julia function as a tensor callback for time-dependent operator elements.
   shape `(d1, d2, ..., d1, d2, ..., batchSize)` for dense operators.
   Write the tensor elements into `storage`.
 - `gradient`: Optional gradient function, `g(time, params, tensor_grad, params_grad)`
-  (CPU) or `g(time, params, tensor_grad, params_grad, stream)` (GPU).
+  (CPU) or `g(time, params, tensor_grad, params_grad, stream)` (GPU). `tensor_grad` has
+  the shape of `storage` and holds the (unconjugated) adjoint of the tensor; the function
+  accumulates `params_grad[i, b] += real(sum(tensor_grad[.., b] .* ∂storage[.., b]/∂params[i, b]))`
+  — `Re`, no factor 2, see [`compute_operator_action_backward!`](@ref).
 - `device`: `:cpu` or `:gpu`, see [`wrap_scalar_callback`](@ref).
 
 # Returns

@@ -4,6 +4,8 @@
 # wrapping, registration, GC safety, and end-to-end usage
 # with operator action computation.
 
+import CUDA.CUDACore: CUstream, C_64F
+
 @testset "Callbacks (local)" begin
 
     # ---- Scalar callback wrapping ----
@@ -31,9 +33,11 @@
                 storage[i] = complex(cos(time), sin(time))
             end
         end
+        # d/dΩ cis(Ωt) = i t cis(Ωt); accumulate Re(scalar_grad · ∂f/∂Ω), never write
+        # into scalar_grad (it is the library's input)
         function my_grad(time, params, scalar_grad, params_grad)
             for i in eachindex(scalar_grad)
-                scalar_grad[i] = complex(-sin(time), cos(time))
+                params_grad[1, i] += real(scalar_grad[i] * im * time * cis(params[1, i] * time))
             end
         end
 
@@ -42,6 +46,91 @@
         @test gcb.callback != C_NULL
         @test gcb.wrapper != C_NULL
         @test gcb.direction == CuDensityMat.CUDENSITYMAT_DIFFERENTIATION_DIR_BACKWARD
+        CuDensityMat.unregister_callback!(refs)
+    end
+
+    # ---- CPU gradient trampolines, driven as cuDensityMat drives them (no GPU) ----
+
+    @testset "CPU scalar gradient trampoline passes scalar_grad through and accumulates" begin
+        seen = ComplexF64[]
+        g(t, p, sg, pg) = (append!(seen, sg); pg[1, :] .+= real.(sg .* im .* cis.(p[1, :])); nothing)
+        _, gcb, refs = CuDensityMat.wrap_scalar_callback((t, p, s) -> nothing; gradient = g)
+        params = [0.4 1.1]                          # (numParams = 1, batchSize = 2)
+        scalar_grad = ComplexF64[0.1 - 0.4im, -0.3 + 0.2im]
+        params_grad = [10.0 20.0]                   # pre-filled: must be accumulated into
+        rc = ccall(
+            gcb.wrapper,
+            Int32,
+            (
+                Ptr{Cvoid},
+                Cdouble,
+                Int64,
+                Int32,
+                Ptr{Cdouble},
+                CuDensityMat.cudaDataType_t,
+                Ptr{Cvoid},
+                Ptr{Cdouble},
+                CUstream,
+            ),
+            gcb.callback,
+            0.0,
+            2,
+            1,
+            params,
+            C_64F,
+            scalar_grad,
+            params_grad,
+            C_NULL,
+        )
+        @test rc == 0
+        @test seen == scalar_grad                   # bit-exact, unconjugated, unscaled
+        @test vec(params_grad) ≈
+              [10.0, 20.0] .+ real.(scalar_grad .* im .* cis.(vec(params))) rtol = 1e-15
+        CuDensityMat.unregister_callback!(refs)
+    end
+
+    @testset "CPU tensor gradient trampoline shapes tensor_grad (d, d, batch)" begin
+        seen = Array{ComplexF64}[]
+        g(t, p, tg, pg) = (push!(seen, copy(tg)); pg[1, :] .+= vec(real.(sum(tg; dims = (1, 2)))); nothing)
+        _, gcb, refs = CuDensityMat.wrap_tensor_callback((t, p, s) -> nothing; gradient = g)
+        tensor_grad = ComplexF64.(reshape(1:8, 2, 2, 2)) .* (1 + 1im)
+        params_grad = [1.0 2.0]
+        extents = Int64[2, 2]
+        rc = ccall(
+            gcb.wrapper,
+            Int32,
+            (
+                Ptr{Cvoid},
+                CuDensityMat.cudensitymatElementaryOperatorSparsity_t,
+                Int32,
+                Ptr{Int64},
+                Ptr{Int32},
+                Cdouble,
+                Int64,
+                Int32,
+                Ptr{Cdouble},
+                CuDensityMat.cudaDataType_t,
+                Ptr{Cvoid},
+                Ptr{Cdouble},
+                CUstream,
+            ),
+            gcb.callback,
+            CuDensityMat.CUDENSITYMAT_OPERATOR_SPARSITY_NONE,
+            2,
+            extents,
+            C_NULL,
+            0.0,
+            2,
+            1,
+            [0.0 0.0],
+            C_64F,
+            tensor_grad,
+            params_grad,
+            C_NULL,
+        )
+        @test rc == 0
+        @test only(seen) == tensor_grad
+        @test vec(params_grad) == [1.0 + 10.0, 2.0 + 26.0]
         CuDensityMat.unregister_callback!(refs)
     end
 
@@ -145,8 +234,9 @@
             params = params,
         )
 
+        # σz |0⟩⟨0| = |0⟩⟨0|, coefficient cis(Ω t) = cis(1)
         result = Array(psi_out.storage)
-        @test any(x -> abs(x) > 0, result)
+        @test result ≈ ComplexF64[cis(1.0), 0, 0, 0] rtol = 1e-12
 
         # Cleanup
         CuDensityMat.unregister_callback!(cb_refs)
@@ -210,8 +300,9 @@
             batch_size = 1,
         )
 
+        # R(0.3) |0⟩⟨0| = (cos 0.3, sin 0.3) in the first column
         result = Array(psi_out.storage)
-        @test any(x -> abs(x) > 0, result)
+        @test result ≈ ComplexF64[cos(0.3), sin(0.3), 0, 0] rtol = 1e-12
 
         CuDensityMat.unregister_callback!(tcb_refs)
         close(ws)
