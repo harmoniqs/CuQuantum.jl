@@ -67,8 +67,10 @@ include("spectrum.jl")
 # --- Handle management ---
 
 # Per-context handle cache following CUDA.jl pattern
-const _handle_cache =
-    HandleCache{CUDACore.CuContext,cudensitymatHandle_t}((_) -> create(), (_, h) -> destroy(h))
+const _handle_cache = HandleCache{CUDACore.CuContext,cudensitymatHandle_t}(
+    (_) -> create(),
+    (_, h) -> destroy(h),
+)
 
 """
     handle() -> cudensitymatHandle_t

@@ -153,7 +153,8 @@ end
         ws = WorkStream()
         dims = [2]
         T = ComplexF64
-        elem = CuDensityMat.create_elementary_operator(ws, [2], CUDA.CuVector{T}(vec(CONV_B)))
+        elem =
+            CuDensityMat.create_elementary_operator(ws, [2], CUDA.CuVector{T}(vec(CONV_B)))
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
         captured = ComplexF64[]
@@ -254,12 +255,14 @@ end
         dims = [2]
         T = ComplexF64
         nb = 2
-        elem = CuDensityMat.create_elementary_operator(ws, [2], CUDA.CuVector{T}(vec(CONV_B)))
+        elem =
+            CuDensityMat.create_elementary_operator(ws, [2], CUDA.CuVector{T}(vec(CONV_B)))
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
         cb, gcb, refs = CuDensityMat.wrap_scalar_callback(
             (t, p, s) -> (s .= cis.(p[1, :]); nothing);
-            gradient = (t, p, sg, pg) -> (pg[1, :] .+= real.(sg .* im .* cis.(p[1, :])); nothing),
+            gradient = (t, p, sg, pg) ->
+                (pg[1, :] .+= real.(sg .* im .* cis.(p[1, :])); nothing),
         )
         operator = CuDensityMat.create_operator(ws, dims)
         CuDensityMat.append_term!(
@@ -282,7 +285,14 @@ end
         params = CUDA.CuVector{Float64}(θs)            # (numParams = 1, batchSize = 2)
         CuDensityMat.prepare_operator_action!(ws, operator, rho_in, rho_out)
         CuDensityMat.initialize_zero!(rho_out)
-        CuDensityMat.compute_operator_action!(ws, operator, rho_in, rho_out; num_params = 1, params)
+        CuDensityMat.compute_operator_action!(
+            ws,
+            operator,
+            rho_in,
+            rho_out;
+            num_params = 1,
+            params,
+        )
         CuDensityMat.prepare_operator_action_backward!(ws, operator, rho_in, rho_out_adj)
         CuDensityMat.initialize_zero!(rho_in_adj)
         params_grad = CUDA.zeros(Float64, nb)
@@ -904,8 +914,7 @@ end
         fd_grad = (cost_at(Ω₀ + ε) - cost_at(Ω₀ - ε)) / (2ε)
 
         # c(Ω) = e^{-Ωt}·Tr(σz ρ): central-difference truncation ε²|c‴|/6 ~ 1e-14.
-        analytic =
-            -t_eval * exp(-Ω₀ * t_eval) * real(tr(_σz * reshape(rho_in_data, 2, 2)))
+        analytic = -t_eval * exp(-Ω₀ * t_eval) * real(tr(_σz * reshape(rho_in_data, 2, 2)))
         @test abs(analytic) > 0.1
         @test backward_grad ≈ analytic rtol = 1e-12
         @test backward_grad ≈ fd_grad rtol = 1e-8
@@ -944,7 +953,10 @@ end
             ρin_adj = DenseMixedState{T}(ws, (2,); batch_size = 1)
             foreach(CuDensityMat.allocate_storage!, (ρin, ρout_adj, ρin_adj))
             copyto!(ρin.storage, CUDA.CuVector{T}([0.7, -0.3im, 0.3im, 0.3]))
-            copyto!(ρout_adj.storage, CUDA.CuVector{T}([1.0, 0.2 + 0.1im, 0.2 - 0.1im, 0.5]))
+            copyto!(
+                ρout_adj.storage,
+                CUDA.CuVector{T}([1.0, 0.2 + 0.1im, 0.2 - 0.1im, 0.5]),
+            )
             prepare_forward && CuDensityMat.prepare_operator_action!(ws, op, ρin, ρout_adj)
             CuDensityMat.prepare_operator_action_backward!(ws, op, ρin, ρout_adj)
             CuDensityMat.initialize_zero!(ρin_adj)

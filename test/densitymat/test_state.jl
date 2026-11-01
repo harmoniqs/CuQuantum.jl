@@ -323,7 +323,9 @@ _rtol(T) = real(T) == Float64 ? 1e-12 : 1e-5
                 ip[i],
                 expected;
                 rtol = _rtol(ComplexF64),
-                atol = _rtol(ComplexF64) * LinearAlgebra.norm(col1) * LinearAlgebra.norm(col2),
+                atol = _rtol(ComplexF64) *
+                       LinearAlgebra.norm(col1) *
+                       LinearAlgebra.norm(col2),
             )
         end
         close(ws)

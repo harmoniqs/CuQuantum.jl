@@ -13,8 +13,8 @@ const D = d^M
 # ---- CPU ----
 a_s = spzeros(T, d, d)
 for n = 1:(d-1)
-    ;
-    a_s[n, n+1] = sqrt(n);
+
+    a_s[n, n+1] = sqrt(n)
 end
 n_s = a_s' * a_s
 kerr_s = n_s * (n_s - sparse(T(1)*I, d, d))
@@ -25,8 +25,8 @@ function embed(op, mode)
     mats = [i == mode ? op : eye_d for i = 1:M]
     r = mats[1]
     for i = 2:M
-        ;
-        r = kron(r, mats[i]);
+
+        r = kron(r, mats[i])
     end
     return r
 end
@@ -45,7 +45,7 @@ end
 
 L = -im * (kron(eye_D, H) - kron(transpose(H), eye_D))
 for m = 1:M
-    am = a_ops[m];
+    am = a_ops[m]
     nm = n_ops[m]
     global L +=
         γ * (kron(conj(am), am) - 0.5*kron(eye_D, nm) - 0.5*kron(transpose(nm), eye_D))
@@ -61,8 +61,8 @@ dims = [d, d]
 
 a_matrix = zeros(Float64, d, d)
 for n = 1:(d-1)
-    ;
-    a_matrix[n, n+1] = sqrt(n);
+
+    a_matrix[n, n+1] = sqrt(n)
 end
 a_dag = transpose(a_matrix)
 
@@ -215,7 +215,7 @@ for i = 1:D
 end
 
 println("\nLargest off-diagonal differences:")
-diffs_offdiag = [(abs(diff_mat[i, j]), i, j) for i in 1:D, j in 1:D if i != j]
+diffs_offdiag = [(abs(diff_mat[i, j]), i, j) for i = 1:D, j = 1:D if i != j]
 sort!(diffs_offdiag, rev = true)
 for (val, i, j) in diffs_offdiag[1:5]
     println(

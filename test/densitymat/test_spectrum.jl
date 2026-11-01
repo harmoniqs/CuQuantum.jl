@@ -106,9 +106,8 @@ end
     end
 
     @gpu_test "largest real eigenvalue" begin
-        λ, ψ, residuals = _extreme_eigenvalue(
-            CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_LARGEST_REAL,
-        )
+        λ, ψ, residuals =
+            _extreme_eigenvalue(CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_LARGEST_REAL)
         @test real(λ) ≈ maximum(SPECTRUM_DIAG) atol = 1e-6
         @test abs(imag(λ)) < 1e-8
         @test abs(ψ[end]) ≈ 1 atol = 1e-6
@@ -116,9 +115,8 @@ end
     end
 
     @gpu_test "smallest real eigenvalue" begin
-        λ, ψ, residuals = _extreme_eigenvalue(
-            CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_SMALLEST_REAL,
-        )
+        λ, ψ, residuals =
+            _extreme_eigenvalue(CuDensityMat.CUDENSITYMAT_OPERATOR_SPECTRUM_SMALLEST_REAL)
         @test real(λ) ≈ minimum(SPECTRUM_DIAG) atol = 1e-6
         @test abs(imag(λ)) < 1e-8
         @test abs(ψ[1]) ≈ 1 atol = 1e-6

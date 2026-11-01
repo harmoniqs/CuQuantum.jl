@@ -234,7 +234,11 @@
         T = ComplexF64
         ws = WorkStream()
         dims = [2]
-        elem = CuDensityMat.create_elementary_operator(ws, [2], CUDA.CuVector{T}([1, 0, 0, -1]))
+        elem = CuDensityMat.create_elementary_operator(
+            ws,
+            [2],
+            CUDA.CuVector{T}([1, 0, 0, -1]),
+        )
         term = CuDensityMat.create_operator_term(ws, dims)
         CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
         op = CuDensityMat.create_operator(ws, dims)

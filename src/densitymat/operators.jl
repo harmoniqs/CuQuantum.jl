@@ -467,7 +467,8 @@ function append_elementary_product_batch!(
     handles = cudensitymatElementaryOperator_t[op.handle for op in elem_operators]
     modes = Int32[m for m in modes_acted_on]
     duality = Int32[d for d in mode_action_duality]
-    total_ptr = total_coefficients === nothing ? CUDACore.CU_NULL : pointer(total_coefficients)
+    total_ptr =
+        total_coefficients === nothing ? CUDACore.CU_NULL : pointer(total_coefficients)
 
     cudensitymatOperatorTermAppendElementaryProductBatch(
         term.ws.handle,
@@ -633,7 +634,8 @@ function append_term_batch!(
     coefficient_callback::cudensitymatWrappedScalarCallback_t = NULL_SCALAR_CALLBACK,
     coefficient_gradient_callback::cudensitymatWrappedScalarGradientCallback_t = NULL_SCALAR_GRADIENT_CALLBACK,
 )
-    total_ptr = total_coefficients === nothing ? CUDACore.CU_NULL : pointer(total_coefficients)
+    total_ptr =
+        total_coefficients === nothing ? CUDACore.CU_NULL : pointer(total_coefficients)
     cudensitymatOperatorAppendTermBatch(
         op.ws.handle,
         op.handle,

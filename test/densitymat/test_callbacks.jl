@@ -37,7 +37,8 @@ import CUDA.CUDACore: CUstream, C_64F
         # into scalar_grad (it is the library's input)
         function my_grad(time, params, scalar_grad, params_grad)
             for i in eachindex(scalar_grad)
-                params_grad[1, i] += real(scalar_grad[i] * im * time * cis(params[1, i] * time))
+                params_grad[1, i] +=
+                    real(scalar_grad[i] * im * time * cis(params[1, i] * time))
             end
         end
 
@@ -53,10 +54,11 @@ import CUDA.CUDACore: CUstream, C_64F
 
     @testset "CPU scalar gradient trampoline passes scalar_grad through and accumulates" begin
         seen = ComplexF64[]
-        g(t, p, sg, pg) = (append!(seen, sg); pg[1, :] .+= real.(sg .* im .* cis.(p[1, :])); nothing)
+        g(t, p, sg, pg) =
+            (append!(seen, sg); pg[1, :] .+= real.(sg .* im .* cis.(p[1, :])); nothing)
         _, gcb, refs = CuDensityMat.wrap_scalar_callback((t, p, s) -> nothing; gradient = g)
         params = [0.4 1.1]                          # (numParams = 1, batchSize = 2)
-        scalar_grad = ComplexF64[0.1 - 0.4im, -0.3 + 0.2im]
+        scalar_grad = ComplexF64[0.1-0.4im, -0.3+0.2im]
         params_grad = [10.0 20.0]                   # pre-filled: must be accumulated into
         rc = ccall(
             gcb.wrapper,
@@ -91,7 +93,11 @@ import CUDA.CUDACore: CUstream, C_64F
 
     @testset "CPU tensor gradient trampoline shapes tensor_grad (d, d, batch)" begin
         seen = Array{ComplexF64}[]
-        g(t, p, tg, pg) = (push!(seen, copy(tg)); pg[1, :] .+= vec(real.(sum(tg; dims = (1, 2)))); nothing)
+        g(t, p, tg, pg) = (
+            push!(seen, copy(tg));
+            pg[1, :] .+= vec(real.(sum(tg; dims = (1, 2))));
+            nothing
+        )
         _, gcb, refs = CuDensityMat.wrap_tensor_callback((t, p, s) -> nothing; gradient = g)
         tensor_grad = ComplexF64.(reshape(1:8, 2, 2, 2)) .* (1 + 1im)
         params_grad = [1.0 2.0]
