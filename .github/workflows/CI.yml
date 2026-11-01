@@ -84,6 +84,9 @@ jobs:
     env:
       JULIA_CUDA_MEMORY_POOL: none
       CUDA_VISIBLE_DEVICES: '0'
+      # Fail (rather than skip every GPU testset) if the runner has no usable
+      # CC >= 7.5 device; see test/setup.jl.
+      CUQUANTUM_TEST_REQUIRE_GPU: 'true'
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6

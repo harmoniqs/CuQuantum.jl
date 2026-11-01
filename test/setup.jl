@@ -30,6 +30,13 @@ else
     "no functional CUDA device"
 end
 
+# Set CUQUANTUM_TEST_REQUIRE_GPU=true on GPU runners (CI, Modal) so a missing driver or
+# an unsupported device fails the run instead of silently turning every GPU testset
+# into a skip that the summary reports as "Broken" next to a green total.
+const REQUIRE_GPU =
+    lowercase(get(ENV, "CUQUANTUM_TEST_REQUIRE_GPU", "")) in ("1", "true", "yes")
+REQUIRE_GPU && !HAS_GPU && error("CUQUANTUM_TEST_REQUIRE_GPU is set but $GPU_SKIP_REASON")
+
 # Names of the GPU testsets that were skipped, reported at the end of the run so
 # they can be scheduled on a capable runner.
 const SKIPPED_GPU_TESTS = String[]
