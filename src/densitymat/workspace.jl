@@ -264,7 +264,12 @@ function workspace_allocate!(
     if ws.workspace_buffer === nothing
         ws.workspace_buffer = CUDACore.CuVector{UInt8}(undef, size)
     end
-    ws.workspace_size = size
+    # Attach the whole buffer, never just `size`: one WorkStream workspace serves every
+    # prepared computation, and a later, smaller requirement (e.g. backward-diff prepare
+    # after the forward prepare) must not shrink the attached size below what an
+    # earlier-prepared computation needs (cuDensityMat then fails the forward compute
+    # with CUDENSITYMAT_STATUS_INVALID_VALUE).
+    ws.workspace_size = length(ws.workspace_buffer)
 
     # Attach to workspace descriptor
     buf_ptr = pointer(ws.workspace_buffer)
@@ -274,7 +279,7 @@ function workspace_allocate!(
         ms,
         wk,
         reinterpret(CuPtr{Cvoid}, buf_ptr),
-        Csize_t(size),
+        Csize_t(ws.workspace_size),
     )
     return nothing
 end

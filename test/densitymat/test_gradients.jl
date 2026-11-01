@@ -345,12 +345,18 @@ end
             end
             CuDensityMat.prepare_operator_action!(ws, operator, rho_in, rho_out)
             out = forward(params)
+            forward_workspace = ws.workspace_size
             CuDensityMat.prepare_operator_action_backward!(
                 ws,
                 operator,
                 rho_in,
                 rho_out_adj,
             )
+            # Regression: the backward prepare must not shrink the attached workspace
+            # below the forward requirement (forward computes after it — the FD below —
+            # failed with INVALID_VALUE on the A10 before the fix).
+            @test ws.workspace_size >= forward_workspace
+            @test forward(params) ≈ out rtol = 1e-13
             CuDensityMat.initialize_zero!(rho_in_adj)
             params_grad = CUDA.zeros(Float64, nb)
             CuDensityMat.compute_operator_action_backward!(
