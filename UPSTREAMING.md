@@ -100,8 +100,16 @@ julia = "1.10"
 
 ## Open items before opening the PR
 
-1. Run the GPU tests here on a CC ≥ 7.5 device against 26.9 (none of the
-   cuDensityMat GPU tests have run against 0.7 yet).
+1. GPU tests against 26.9 / libcudensitymat 0.7.0: the full suite at `d34a6ba`
+   passed on an NVIDIA A10 (CC 8.6, Modal) with 1026 pass / 0 fail / 12 broken —
+   the 12 are the MPI/NCCL testsets, skipped because the runner has a single GPU
+   and no MPI.jl. The MPI paths are still untested against 0.7. The test audit that
+   followed (gradient-convention oracles, dense-CPU reference for the Lindblad
+   integration test, tightened tolerances) needs one more GPU run before the PR.
+   Note for upstream: the gradient-callback convention here is `Re(...)` with no
+   factor 2 for `state_out_adj` seeded as `∂L/∂Re ρ + i ∂L/∂Im ρ`; the header's
+   `2·Re(...)` is the same number for a Wirtinger seed `∂L/∂ρ*` (see
+   `compute_operator_action_backward!`).
 2. Decide what upstream gets: just the generated layer plus a thin `wrappers.jl`
    (what `cuStateVec` started with), or the high-level API too.
 3. Agree on the package name (`cuDensityMat`, following `cuStateVec` /
