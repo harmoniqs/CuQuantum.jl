@@ -2,6 +2,8 @@ using Test
 
 include("setup.jl")
 
+HAS_GPU || @warn "Skipping cuDensityMat GPU tests: $GPU_SKIP_REASON"
+
 @testset "CuQuantum.jl" begin
 
     @testset "Module loading" begin
@@ -13,15 +15,8 @@ include("setup.jl")
 
     @testset "CuDensityMat" begin
 
-        @testset "Version" begin
-            if HAS_GPU
-                v = CuDensityMat.version()
-                @test v isa VersionNumber
-                @test v >= v"0.0.0"
-            else
-                @test_skip "No GPU available for version query"
-            end
-        end
+        # Binding / ABI / version checks (no GPU needed)
+        include("densitymat/test_bindings.jl")
 
         # Phase 1: WorkStream tests
         include("densitymat/test_workstream.jl")
@@ -39,6 +34,7 @@ include("setup.jl")
 
         # Phase 5: Callback tests
         include("densitymat/test_callbacks.jl")
+        include("densitymat/test_gpu_callbacks.jl")
 
         # Phase 7: Gradient / backward differentiation tests
         include("densitymat/test_gradients.jl")
@@ -53,4 +49,9 @@ include("setup.jl")
         include("densitymat/test_integration.jl")
 
     end
+end
+
+if !isempty(SKIPPED_GPU_TESTS)
+    @info "GPU tests skipped ($GPU_SKIP_REASON); run them on a CC >= $CUDENSITYMAT_MIN_CAPABILITY device:\n" *
+          join("  - " .* SKIPPED_GPU_TESTS, "\n")
 end

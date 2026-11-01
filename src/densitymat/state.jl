@@ -59,7 +59,7 @@ mutable struct DensePureState{T} <: AbstractState{T}
     hilbert_space_dims::Vector{Int64}
     batch_size::Int64
     handle::cudensitymatState_t
-    storage::Union{Nothing,CUDA.CuVector{T}}
+    storage::Union{Nothing,CUDACore.CuVector{T}}
     _owns_storage::Bool
 
     function DensePureState{T}(
@@ -112,7 +112,7 @@ mutable struct DenseMixedState{T} <: AbstractState{T}
     hilbert_space_dims::Vector{Int64}
     batch_size::Int64
     handle::cudensitymatState_t
-    storage::Union{Nothing,CUDA.CuVector{T}}
+    storage::Union{Nothing,CUDACore.CuVector{T}}
     _owns_storage::Bool
 
     function DenseMixedState{T}(
@@ -257,7 +257,7 @@ end
 Attach a GPU buffer to the state. The buffer must be F-contiguous and
 match the required storage size.
 """
-function attach_storage!(state::DenseState{T}, data::CUDA.CuVector{T}) where {T}
+function attach_storage!(state::DenseState{T}, data::CUDACore.CuVector{T}) where {T}
     _check_state_valid(state)
     expected_size = storage_size(state)
     length(data) >= expected_size ||
@@ -284,7 +284,7 @@ Allocate an appropriately sized buffer and attach it to the state.
 function allocate_storage!(state::DenseState{T}) where {T}
     _check_state_valid(state)
     sz = storage_size(state)
-    buf = CUDA.zeros(T, sz)
+    buf = CUDACore.zeros(T, sz)
     attach_storage!(state, buf)
     state._owns_storage = true
     return nothing
@@ -310,7 +310,7 @@ Set all elements of the state to zero using the C API.
 """
 function initialize_zero!(state::AbstractState)
     _check_state_valid(state)
-    cudensitymatStateInitializeZero(state.ws.handle, state.handle, CUDA.stream().handle)
+    cudensitymatStateInitializeZero(state.ws.handle, state.handle, CUDACore.stream().handle)
     return nothing
 end
 
@@ -330,9 +330,9 @@ function inplace_scale!(state::DenseState{T}, factors) where {T}
         state.ws.handle,
         state.handle,
         pointer(factors_gpu),
-        CUDA.stream().handle,
+        CUDACore.stream().handle,
     )
-    CUDA.synchronize()
+    CUDACore.synchronize()
     return nothing
 end
 
@@ -344,14 +344,14 @@ Compute the squared Frobenius norm(s). Returns a CPU vector of length `batch_siz
 function norm(state::DenseState{T}) where {T}
     _check_state_valid(state)
     RT = real_eltype(T)
-    result = CUDA.zeros(RT, state.batch_size)
+    result = CUDACore.zeros(RT, state.batch_size)
     cudensitymatStateComputeNorm(
         state.ws.handle,
         state.handle,
         pointer(result),
-        CUDA.stream().handle,
+        CUDACore.stream().handle,
     )
-    CUDA.synchronize()
+    CUDACore.synchronize()
     return Array(result)
 end
 
@@ -362,14 +362,14 @@ Compute the trace(s). Returns a CPU vector of length `batch_size`.
 """
 function trace(state::DenseState{T}) where {T}
     _check_state_valid(state)
-    result = CUDA.zeros(T, state.batch_size)
+    result = CUDACore.zeros(T, state.batch_size)
     cudensitymatStateComputeTrace(
         state.ws.handle,
         state.handle,
         pointer(result),
-        CUDA.stream().handle,
+        CUDACore.stream().handle,
     )
-    CUDA.synchronize()
+    CUDACore.synchronize()
     return Array(result)
 end
 
@@ -390,9 +390,9 @@ function inplace_accumulate!(
         src.handle,
         dest.handle,
         pointer(factors_gpu),
-        CUDA.stream().handle,
+        CUDACore.stream().handle,
     )
-    CUDA.synchronize()
+    CUDACore.synchronize()
     return nothing
 end
 
@@ -403,15 +403,15 @@ Compute inner product(s) ⟨left|right⟩. Returns a CPU vector of length `batch
 """
 function inner_product(left::DenseState{T}, right::DenseState{T}) where {T}
     _check_state_compatibility(left, right)
-    result = CUDA.zeros(T, left.batch_size)
+    result = CUDACore.zeros(T, left.batch_size)
     cudensitymatStateComputeInnerProduct(
         left.ws.handle,
         left.handle,
         right.handle,
         pointer(result),
-        CUDA.stream().handle,
+        CUDACore.stream().handle,
     )
-    CUDA.synchronize()
+    CUDACore.synchronize()
     return Array(result)
 end
 
@@ -422,14 +422,14 @@ end
 
 Clone a state with a new storage buffer.
 """
-function clone(state::DensePureState{T}, buf::CUDA.CuVector{T}) where {T}
+function clone(state::DensePureState{T}, buf::CUDACore.CuVector{T}) where {T}
     new_state =
         DensePureState{T}(state.ws, state.hilbert_space_dims; batch_size = state.batch_size)
     attach_storage!(new_state, buf)
     return new_state
 end
 
-function clone(state::DenseMixedState{T}, buf::CUDA.CuVector{T}) where {T}
+function clone(state::DenseMixedState{T}, buf::CUDACore.CuVector{T}) where {T}
     new_state = DenseMixedState{T}(
         state.ws,
         state.hilbert_space_dims;
@@ -443,14 +443,14 @@ end
 
 function _prepare_factors(state::DenseState{T}, factors) where {T}
     if factors isa Number
-        return CUDA.fill(T(factors), state.batch_size)
+        return CUDACore.fill(T(factors), state.batch_size)
     elseif factors isa AbstractVector
         length(factors) == state.batch_size ||
             error("factors length $(length(factors)) != batch_size $(state.batch_size)")
-        if factors isa CUDA.CuVector{T}
+        if factors isa CUDACore.CuVector{T}
             return factors
         else
-            return CUDA.CuVector{T}(T.(factors))
+            return CUDACore.CuVector{T}(T.(factors))
         end
     else
         error("factors must be a Number or AbstractVector, got $(typeof(factors))")

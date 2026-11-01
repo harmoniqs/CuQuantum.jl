@@ -164,8 +164,10 @@
         CuDensityMat.allocate_storage!(psi_in)
         CuDensityMat.allocate_storage!(psi_out)
 
-        # Set input to identity/2: rho = [[0.5, 0], [0, 0.5]]
-        copyto!(psi_in.storage, CUDA.CuVector{T}([0.5, 0.0, 0.0, 0.5]))
+        # Input with off-diagonal coherences (identity/2 would hide a transposed or
+        # bra-side action): rho = [[0.6, 0.2-0.1i], [0.2+0.1i, 0.4]]
+        ρ = T[0.6 0.2-0.1im; 0.2+0.1im 0.4]
+        copyto!(psi_in.storage, CUDA.CuVector{T}(vec(ρ)))
 
         # Prepare action
         CuDensityMat.prepare_operator_action!(ws, operator, psi_in, psi_out)
@@ -181,9 +183,9 @@
             batch_size = 1,
         )
 
-        # Verify output is non-zero (sigma_z * rho should be non-trivial)
+        # ket-side action: σz ρ
         result = Array(psi_out.storage)
-        @test any(x -> abs(x) > 0, result)
+        @test result ≈ vec(T[1 0; 0 -1] * ρ) rtol = 1e-12
 
         close(ws)
     end
@@ -221,8 +223,10 @@
         CuDensityMat.allocate_storage!(psi_in1)
         CuDensityMat.allocate_storage!(psi_in2)
         CuDensityMat.allocate_storage!(psi_out)
-        copyto!(psi_in1.storage, CUDA.CuVector{T}([0.5, 0.0, 0.0, 0.5]))
-        copyto!(psi_in2.storage, CUDA.CuVector{T}([0.5, 0.0, 0.0, 0.5]))
+        ρ1 = T[0.6 0.2-0.1im; 0.2+0.1im 0.4]
+        ρ2 = T[0.3 0.1im; -0.1im 0.7]
+        copyto!(psi_in1.storage, CUDA.CuVector{T}(vec(ρ1)))
+        copyto!(psi_in2.storage, CUDA.CuVector{T}(vec(ρ2)))
 
         # Prepare action
         CuDensityMat.prepare_action!(ws, action, [psi_in1, psi_in2], psi_out)
@@ -238,10 +242,46 @@
             batch_size = 1,
         )
 
+        # sum of the two actions: σz ρ1 + σx ρ2
         result = Array(psi_out.storage)
-        @test any(x -> abs(x) > 0, result)
+        @test result ≈ vec(T[1 0; 0 -1] * ρ1 + T[0 1; 1 0] * ρ2) rtol = 1e-12
 
         CuDensityMat.destroy_operator_action(action)
+        close(ws)
+    end
+
+    # Duality: a term appended with duality = 1 acts from the right (ρ·A, not ρ·Aᵀ),
+    # and its complex coefficient is not conjugated — the commutator -i[H, ρ] relies on
+    # both (coefficients -i on the left, +i on the right, as in NVIDIA's samples).
+    @gpu_test "bra-side (duality = 1) action with a complex coefficient" begin
+        ws = WorkStream()
+        dims = [2]
+        T = ComplexF64
+        A = T[0.2 1.0-0.5im; 0.3im -0.4]          # non-symmetric: ρA ≠ ρAᵀ
+        c = 0.5 + 0.1im
+        elem = CuDensityMat.create_elementary_operator(ws, [2], CUDA.CuVector{T}(vec(A)))
+        term = CuDensityMat.create_operator_term(ws, dims)
+        CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
+        ρ = T[0.6 0.2-0.1im; 0.2+0.1im 0.4]
+        function act(duality)
+            op = CuDensityMat.create_operator(ws, dims)
+            CuDensityMat.append_term!(op, term; duality, coefficient = c)
+            ρin = DenseMixedState{T}(ws, (2,); batch_size = 1)
+            ρout = DenseMixedState{T}(ws, (2,); batch_size = 1)
+            CuDensityMat.allocate_storage!(ρin)
+            CuDensityMat.allocate_storage!(ρout)
+            copyto!(ρin.storage, CUDA.CuVector{T}(vec(ρ)))
+            CuDensityMat.prepare_operator_action!(ws, op, ρin, ρout)
+            CuDensityMat.initialize_zero!(ρout)
+            CuDensityMat.compute_operator_action!(ws, op, ρin, ρout)
+            return reshape(Array(ρout.storage), 2, 2)
+        end
+        left = act(0)
+        right = act(1)
+        @test left ≈ c * A * ρ rtol = 1e-12
+        @test right ≈ c * ρ * A rtol = 1e-12
+        @test !isapprox(right, c * ρ * transpose(A); rtol = 0.1)   # negative control
+        @test !isapprox(right, conj(c) * ρ * A; rtol = 0.1)        # negative control
         close(ws)
     end
 
@@ -260,7 +300,7 @@
             @test action.handle != C_NULL
         end
         GC.gc(true)
-        @test true
+        @test isopen(ws)  # finalizing the action left the WorkStream usable
         close(ws)
     end
 

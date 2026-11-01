@@ -87,6 +87,34 @@
         close(ws)
     end
 
+    # σy on a state with complex coherences: Tr(σy ρ) = 0.2, while the transposed
+    # contraction Tr(σyᵀ ρ) would give -0.2 (diagonal operators cannot tell them apart).
+    @gpu_test "expectation value of sigma_y on a coherent state" begin
+        ws = WorkStream()
+        dims = [2]
+        T = ComplexF64
+        σy = T[0 -im; im 0]
+        elem = CuDensityMat.create_elementary_operator(ws, [2], CUDA.CuVector{T}(vec(σy)))
+        term = CuDensityMat.create_operator_term(ws, dims)
+        CuDensityMat.append_elementary_product!(term, [elem], Int32[0], Int32[0])
+        operator = CuDensityMat.create_operator(ws, dims)
+        CuDensityMat.append_term!(operator, term; duality = 0)
+        ρ = T[0.6 0.2-0.1im; 0.2+0.1im 0.4]
+        rho = DenseMixedState{T}(ws, (2,); batch_size = 1)
+        CuDensityMat.allocate_storage!(rho)
+        copyto!(rho.storage, CUDA.CuVector{T}(vec(ρ)))
+        exp = CuDensityMat.create_expectation(ws, operator)
+        CuDensityMat.prepare_expectation!(ws, exp, rho)
+        result = CUDA.zeros(T, 1)
+        CuDensityMat.compute_expectation!(ws, exp, rho, result; time = 0.0, batch_size = 1)
+        val = Array(result)[1]
+        @test val ≈ tr(σy * ρ) atol = 1e-12
+        @test real(tr(σy * ρ)) ≈ 0.2 atol = 1e-12
+        @test !isapprox(val, tr(transpose(σy) * ρ); atol = 0.1) # negative control
+        CuDensityMat.destroy_expectation(exp)
+        close(ws)
+    end
+
     @gpu_test "expectation value of identity on mixed state" begin
         ws = WorkStream()
         dims = [2]
@@ -113,6 +141,7 @@
         # Tr(I * I/2) = Tr(I/2) = 1
         val = Array(result)
         @test abs(real(val[1]) - 1.0) < 1e-10
+        @test abs(imag(val[1])) < 1e-10
 
         CuDensityMat.destroy_expectation(exp)
         close(ws)

@@ -4,21 +4,24 @@ version = "0.1.0"
 authors = ["Jack Champagne <jack@harmoniqs.co>"]
 
 [deps]
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+CUDACore = "bd0ed864-bdfe-4181-a5ed-ce625a5fdea2"
 CUDA_Runtime_Discovery = "1af6417a-86b4-443c-805f-a4643ffb695f"
 CEnum = "fa961155-64e5-5f13-b03f-caf6b980ea82"
 cuQuantum_jll = "b75408ef-6fdf-5d74-b65a-7df000ad18e6"
 
 [compat]
-CUDA = "5, 6.0"
-CUDA_Runtime_Discovery = "0.3, 1.0, 2.0"
-CEnum = "0.4, 0.5"
-cuQuantum_jll = "24, 25, 26.1"
+CUDA = "6.5"
+CUDACore = "6.5"
+CUDA_Runtime_Discovery = "2"
+CEnum = "0.5, 1"
+cuQuantum_jll = "26.9"
 julia = "1.10"
 
 [extras]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "LinearAlgebra"]
+test = ["Test", "CUDA", "LinearAlgebra", "Libdl"]

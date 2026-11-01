@@ -32,6 +32,11 @@ function make_state(ws, T, dims, batch_size; mixed = false, init = :random)
     return state
 end
 
+# Tolerance for comparing a library reduction / elementwise op on a handful of
+# elements against the host result: a few hundred ulps of the element type
+# (Float64: ~1e-13, the old 1e-4/1e-5 were ~10⁸× too loose; Float32: ~1e-5).
+_rtol(T) = real(T) == Float64 ? 1e-12 : 1e-5
+
 @testset "State (local)" begin
 
     # ---- Creation & storage ----
@@ -150,7 +155,7 @@ end
             original = Array(psi.storage)
             CuDensityMat.inplace_scale!(psi, T(2))
             scaled = Array(psi.storage)
-            @test scaled ≈ original .* T(2) rtol=1e-5
+            @test scaled ≈ original .* T(2) rtol = _rtol(T)
         end
         close(ws)
     end
@@ -167,7 +172,7 @@ end
         scaled = reshape(Array(psi.storage), shape)
 
         for i = 1:2
-            @test scaled[:, i] ≈ orig_view[:, i] .* factors[i] rtol=1e-5
+            @test scaled[:, i] ≈ orig_view[:, i] .* factors[i] rtol = _rtol(ComplexF64)
         end
         close(ws)
     end
@@ -183,7 +188,7 @@ end
                 # Manual: squared frobenius norm
                 arr = Array(psi.storage)
                 expected = real(dot(arr, arr))
-                @test n[1] ≈ expected rtol=1e-4
+                @test n[1] ≈ expected rtol = _rtol(T)
             end
         end
         close(ws)
@@ -199,7 +204,7 @@ end
         for i = 1:2
             col = vec(arr[ntuple(_->:, length(shape)-1)..., i])
             expected = real(dot(col, col))
-            @test n[i] ≈ expected rtol=1e-5
+            @test n[i] ≈ expected rtol = _rtol(ComplexF64)
         end
         close(ws)
     end
@@ -212,7 +217,7 @@ end
             # For pure states, trace = <psi|psi>
             arr = Array(psi.storage)
             expected = dot(arr, arr)
-            @test t[1] ≈ expected rtol=1e-4
+            @test t[1] ≈ expected rtol = _rtol(T)
         end
         close(ws)
     end
@@ -226,7 +231,7 @@ end
         d = prod(rho.hilbert_space_dims)
         mat = reshape(arr[1:(d^2)], (d, d))
         expected = tr(mat)
-        @test t[1] ≈ expected rtol=1e-5
+        @test t[1] ≈ expected rtol = _rtol(ComplexF64)
         close(ws)
     end
 
@@ -258,7 +263,8 @@ end
             CuDensityMat.inplace_accumulate!(psi1, psi2_clone, factor)
             result = Array(psi1.storage)
             expected = arr1 .+ factor .* arr2
-            @test result ≈ expected rtol=1e-4
+            @test result ≈ expected rtol = _rtol(T)
+            @test !isapprox(result, arr1; rtol = 0.01) # the accumulation did something
         end
         close(ws)
     end
@@ -280,7 +286,13 @@ end
             arr1 = Array(psi1.storage)
             arr2 = Array(psi2.storage)
             expected = dot(arr1, arr2)
-            @test ip[1] ≈ expected rtol=1e-4
+            # atol guards against cancellation in the complex sum
+            @test isapprox(
+                ip[1],
+                expected;
+                rtol = _rtol(T),
+                atol = _rtol(T) * LinearAlgebra.norm(arr1) * LinearAlgebra.norm(arr2),
+            )
         end
         close(ws)
     end
@@ -307,7 +319,14 @@ end
             col1 = vec(arr1[ntuple(_->:, length(shape)-1)..., i])
             col2 = vec(arr2[ntuple(_->:, length(shape)-1)..., i])
             expected = dot(col1, col2)
-            @test ip[i] ≈ expected rtol=1e-5
+            @test isapprox(
+                ip[i],
+                expected;
+                rtol = _rtol(ComplexF64),
+                atol = _rtol(ComplexF64) *
+                       LinearAlgebra.norm(col1) *
+                       LinearAlgebra.norm(col2),
+            )
         end
         close(ws)
     end
@@ -320,7 +339,8 @@ end
             psi.handle
         end
         GC.gc(true)
-        @test true  # no crash = success
+        # no crash, and the WorkStream still creates and sizes states afterwards
+        @test CuDensityMat.storage_size(DensePureState{ComplexF64}(ws, (2,))) == 2
         close(ws)
     end
 

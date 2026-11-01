@@ -14,7 +14,7 @@ Planned:
 """
 module CuQuantum
 
-using CUDA
+using CUDACore
 
 # CuDensityMat submodule
 include("densitymat/CuDensityMat.jl")

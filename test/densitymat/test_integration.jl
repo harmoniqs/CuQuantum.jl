@@ -426,6 +426,7 @@
 
         times = Float64[]
         traces = ComplexF64[]
+        rhos = Matrix{ComplexF64}[]  # full ρ per step, for the dense CPU oracle
         pop_10 = Float64[]  # P(|1,0⟩): photon in cavity 1
         pop_01 = Float64[]  # P(|0,1⟩): photon in cavity 2
         pop_00 = Float64[]  # P(|0,0⟩): vacuum (photon lost)
@@ -437,6 +438,7 @@
             d_tot = d_total
 
             push!(times, t)
+            push!(rhos, reshape(copy(rho_cpu), d_tot, d_tot))
             tr = sum(rho_cpu[k+d_tot*(k-1)] for k = 1:d_tot)
             push!(traces, tr)
 
@@ -510,32 +512,68 @@
         # 13. Assertions
         # =====================================================================
 
-        # (a) Output trajectory has data
-        @test length(times) > 10
+        # (a) Output trajectory has every step
+        @test length(times) == n_steps + 1
 
         # (b) Initial state was |1,0⟩⟨1,0|
         @test abs(pop_10[1] - 1.0) < 1e-10
         @test abs(pop_01[1]) < 1e-10
         @test abs(pop_00[1]) < 1e-10
 
-        # (c) Trace should be preserved (≈ 1) throughout — Lindblad preserves trace.
-        # RK4 is much more accurate than Euler, so tighter tolerance is reasonable.
-        for (i, tr) in enumerate(traces)
-            @test abs(real(tr) - 1.0) < 0.02
+        # (c) Independent oracle: the same Liouvillian built as a dense
+        # CPU map on 9×9 matrices and integrated with the same RK4 steps. Mode 0 is
+        # the fastest index of the flattened state, so an operator X on mode 0 is
+        # kron(I, X) and on mode 1 is kron(X, I).
+        Id = Matrix{ComplexF64}(I, d, d)
+        on0(X) = kron(Id, X)
+        on1(X) = kron(X, Id)
+        a = ComplexF64.(a_matrix)
+        n = a' * a
+        kerr = a' * a' * a * a
+        a_m = (on0(a), on1(a))
+        n_m = (on0(n), on1(n))
+        H(t) =
+            χ * (on0(kerr) + on1(kerr)) +
+            Δ[1] * sin(ω_δ[1] * t) * n_m[1] +
+            Δ[2] * sin(ω_δ[2] * t) * n_m[2] +
+            κ₀ * (1 + ε * cos(ω_κ * t)) * (kron(a, a') + kron(a', a))
+        function L(t, ρ)
+            Ht = H(t)
+            out = -im * (Ht * ρ - ρ * Ht)
+            for m = 1:M
+                out += γ * (a_m[m] * ρ * a_m[m]' - (n_m[m] * ρ + ρ * n_m[m]) / 2)
+            end
+            return out
         end
-
-        # (d) Population has transferred: |1,0⟩ decreased, |0,1⟩ increased (coupling)
-        @test pop_10[end] < pop_10[1]   # photon left cavity 1
-        @test pop_01[end] > pop_01[1]   # photon arrived in cavity 2
-
-        # (e) Photon loss: vacuum population increased
-        @test pop_00[end] > pop_00[1]
-
-        # (f) Populations are physical (non-negative, within [0,1])
-        for p in [pop_10; pop_01; pop_00]
-            @test p >= -0.01  # allow tiny numerical error
-            @test p <= 1.01
+        ρ_ref = reshape(ComplexF64.(rho_init), d_total, d_total)
+        max_dev = 0.0
+        for step = 1:n_steps
+            t = (step - 1) * dt
+            k1 = L(t, ρ_ref)
+            k2 = L(t + dt / 2, ρ_ref + dt / 2 * k1)
+            k3 = L(t + dt / 2, ρ_ref + dt / 2 * k2)
+            k4 = L(t + dt, ρ_ref + dt * k3)
+            ρ_ref = ρ_ref + dt / 6 * (k1 + 2k2 + 2k3 + k4)
+            max_dev = max(max_dev, maximum(abs, rhos[step+1] - ρ_ref))
         end
+        # FP64 on both sides, 100 steps: agreement to ~1e-14 expected; 1e-10 leaves
+        # room for GPU contraction order and is still ~10⁸× below the dynamics.
+        @test max_dev < 1e-10
+
+        # (d) Trace is preserved exactly by RK4 for a trace-preserving L (Tr L[ρ] = 0
+        # identically, even with Fock truncation). The old 0.02 tolerance equalled the
+        # whole photon-loss signal γ·t_final, so a wrong dissipator still passed it.
+        @test maximum(tr -> abs(real(tr) - 1.0), traces) < 1e-10
+        @test maximum(tr -> abs(imag(tr)), traces) < 1e-10
+
+        # (e) Physics sanity, with margins well outside the oracle tolerance:
+        # population transfer through the coupling and photon loss into vacuum.
+        @test pop_10[end] < pop_10[1] - 1e-3   # photon left cavity 1
+        @test pop_01[end] > pop_01[1] + 1e-3   # photon arrived in cavity 2
+        @test pop_00[end] > pop_00[1] + 1e-3   # photon loss
+        # Populations are physical (non-negative up to roundoff, ≤ 1)
+        @test minimum([pop_10; pop_01; pop_00]) > -1e-12
+        @test maximum([pop_10; pop_01; pop_00]) < 1 + 1e-12
 
         # =====================================================================
         # 14. Save trajectory data for plotting
@@ -566,7 +604,6 @@
                 )
             end
         end
-        @test isfile(trajectory_file)
 
         # =====================================================================
         # 15. Cleanup
