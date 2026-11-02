@@ -61,6 +61,7 @@ mutable struct DensePureState{T} <: AbstractState{T}
     handle::cudensitymatState_t
     storage::Union{Nothing,CUDACore.CuVector{T}}
     _owns_storage::Bool
+    _meta::Any   # argument arrays passed by pointer (dims, attach pointers/sizes)
 
     function DensePureState{T}(
         ws::WorkStream,
@@ -79,12 +80,11 @@ mutable struct DensePureState{T} <: AbstractState{T}
             julia_to_cuda_dtype(T),
             state_ref,
         )
-        obj = new{T}(ws, dims, Int64(batch_size), state_ref[], nothing, false)
+        obj = new{T}(ws, dims, Int64(batch_size), state_ref[], nothing, false, nothing)
         finalizer(obj) do x
-            if x.handle != C_NULL
-                cudensitymatDestroyState(x.handle)
-                x.handle = C_NULL
-            end
+            h = x.handle
+            x.handle = C_NULL
+            h != C_NULL && _defer_destroy(x, 5, () -> cudensitymatDestroyState(h))
         end
         return obj
     end
@@ -114,6 +114,7 @@ mutable struct DenseMixedState{T} <: AbstractState{T}
     handle::cudensitymatState_t
     storage::Union{Nothing,CUDACore.CuVector{T}}
     _owns_storage::Bool
+    _meta::Any   # argument arrays passed by pointer (dims, attach pointers/sizes)
 
     function DenseMixedState{T}(
         ws::WorkStream,
@@ -132,12 +133,11 @@ mutable struct DenseMixedState{T} <: AbstractState{T}
             julia_to_cuda_dtype(T),
             state_ref,
         )
-        obj = new{T}(ws, dims, Int64(batch_size), state_ref[], nothing, false)
+        obj = new{T}(ws, dims, Int64(batch_size), state_ref[], nothing, false, nothing)
         finalizer(obj) do x
-            if x.handle != C_NULL
-                cudensitymatDestroyState(x.handle)
-                x.handle = C_NULL
-            end
+            h = x.handle
+            x.handle = C_NULL
+            h != C_NULL && _defer_destroy(x, 5, () -> cudensitymatDestroyState(h))
         end
         return obj
     end
@@ -272,6 +272,7 @@ function attach_storage!(state::DenseState{T}, data::CUDACore.CuVector{T}) where
         buf_sizes,
     )
     state.storage = data
+    state._meta = (buf_ptrs, buf_sizes)
     state._owns_storage = false
     return nothing
 end

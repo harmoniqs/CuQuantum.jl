@@ -46,6 +46,9 @@ include("error.jl")
 # Convenience wrappers
 include("wrappers.jl")
 
+# Deferred, ordered destruction of GC-reclaimed library objects
+include("lifetime.jl")
+
 # WorkStream (high-level handle + workspace + stream + communicator)
 include("workspace.jl")
 

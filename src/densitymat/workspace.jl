@@ -39,6 +39,10 @@ mutable struct WorkStream
     comm_set::Bool
     # Hold a reference to any comm data to prevent GC
     _comm_ref::Any
+    # `close` marks the stream unusable and frees the workspace buffer; the library handle
+    # and workspace descriptor are destroyed only once the WorkStream is unreachable (every
+    # state/operator created from it holds a reference to it), see lifetime.jl.
+    _closed::Bool
 
     function WorkStream(;
         stream::Union{Nothing,CUDACore.CuStream} = nothing,
@@ -73,41 +77,47 @@ mutable struct WorkStream
             CUDENSITYMAT_DISTRIBUTED_PROVIDER_NONE,
             false,
             nothing,
+            false,
         )
 
-        # Register finalizer
+        push!(_LIVE_HANDLES, UInt(h))
+        # Register finalizer (deferred: no library call from a finalizer, see lifetime.jl)
         finalizer(obj) do x
-            _destroy!(x)
+            wsd, h = x.workspace, x.handle
+            x.workspace = C_NULL
+            x.handle = C_NULL
+            x.workspace_buffer = nothing
+            (wsd != C_NULL || h != C_NULL) && _defer_destroy(
+                x,
+                6,
+                () -> begin
+                    wsd != C_NULL && cudensitymatDestroyWorkspace(wsd)
+                    h != C_NULL && destroy(h)
+                end,
+                UInt(h),
+            )
         end
 
         return obj
     end
 end
 
-function _destroy!(ws::WorkStream)
-    if ws.workspace != C_NULL
-        # Free workspace buffer first
-        if ws.workspace_buffer !== nothing
-            CUDACore.unsafe_free!(ws.workspace_buffer)
-            ws.workspace_buffer = nothing
-        end
-        cudensitymatDestroyWorkspace(ws.workspace)
-        ws.workspace = C_NULL
-    end
-    if ws.handle != C_NULL
-        destroy(ws.handle)
-        ws.handle = C_NULL
-    end
-    return nothing
-end
-
 """
     close(ws::WorkStream)
 
-Explicitly release all resources held by the WorkStream.
+Close the WorkStream: it can no longer be used, and its workspace buffer is freed now.
+The library handle and workspace descriptor are destroyed when the WorkStream is garbage
+collected — after every state/operator created from it (they reference it), never
+before them (destroying the handle first is a use-after-free in cuDensityMat).
 """
 function Base.close(ws::WorkStream)
-    _destroy!(ws)
+    if ws.workspace_buffer !== nothing
+        CUDACore.unsafe_free!(ws.workspace_buffer)
+        ws.workspace_buffer = nothing
+    end
+    ws.workspace_size = 0
+    ws._closed = true
+    _bury!(UInt(ws.handle))
     return nothing
 end
 
@@ -116,10 +126,11 @@ end
 
 Check if the WorkStream is still valid (not yet closed/finalized).
 """
-Base.isopen(ws::WorkStream) = ws.handle != C_NULL && ws.workspace != C_NULL
+Base.isopen(ws::WorkStream) = !ws._closed && ws.handle != C_NULL && ws.workspace != C_NULL
 
 function _check_valid(ws::WorkStream)
     isopen(ws) || error("WorkStream has been closed or finalized")
+    drain_pending_destroys!()
 end
 
 # --- Communicator management ---
