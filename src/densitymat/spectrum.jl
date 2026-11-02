@@ -23,10 +23,10 @@ mutable struct OperatorSpectrum
     )
         obj = new(handle, ws, operator)
         finalizer(obj) do x
-            if x.handle != C_NULL
-                cudensitymatDestroyOperatorSpectrum(x.handle)
-                x.handle = C_NULL
-            end
+            h = x.handle
+            x.handle = C_NULL
+            h != C_NULL &&
+                _defer_destroy(x, 1, () -> cudensitymatDestroyOperatorSpectrum(h))
         end
         return obj
     end

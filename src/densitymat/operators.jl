@@ -81,10 +81,10 @@ mutable struct ElementaryOperator
     )
         obj = new(handle, ws, data_ref, callback_refs)
         finalizer(obj) do x
-            if x.handle != C_NULL
-                cudensitymatDestroyElementaryOperator(x.handle)
-                x.handle = C_NULL
-            end
+            h = x.handle
+            x.handle = C_NULL
+            h != C_NULL &&
+                _defer_destroy(x, 4, () -> cudensitymatDestroyElementaryOperator(h))
         end
         return obj
     end
@@ -141,7 +141,14 @@ function create_elementary_operator(
         op_ref,
     )
 
-    return ElementaryOperator(op_ref[], ws; data_ref = data)
+    # The library may keep the extents / diagonal-offsets pointers: root them with the
+    # operator (`_callback_refs`) for its lifetime.
+    return ElementaryOperator(
+        op_ref[],
+        ws;
+        data_ref = data,
+        callback_refs = (extents, offsets),
+    )
 end
 
 """
@@ -187,7 +194,14 @@ function create_elementary_operator_batch(
         op_ref,
     )
 
-    return ElementaryOperator(op_ref[], ws; data_ref = data)
+    # The library may keep the extents / diagonal-offsets pointers: root them with the
+    # operator (`_callback_refs`) for its lifetime.
+    return ElementaryOperator(
+        op_ref[],
+        ws;
+        data_ref = data,
+        callback_refs = (extents, offsets),
+    )
 end
 
 function destroy_elementary_operator(op::ElementaryOperator)
@@ -221,10 +235,9 @@ mutable struct MatrixOperator
     )
         obj = new(handle, ws, data_ref, callback_refs)
         finalizer(obj) do x
-            if x.handle != C_NULL
-                cudensitymatDestroyMatrixOperator(x.handle)
-                x.handle = C_NULL
-            end
+            h = x.handle
+            x.handle = C_NULL
+            h != C_NULL && _defer_destroy(x, 4, () -> cudensitymatDestroyMatrixOperator(h))
         end
         return obj
     end
@@ -260,7 +273,7 @@ function create_matrix_operator(
         op_ref,
     )
 
-    return MatrixOperator(op_ref[], ws; data_ref = data)
+    return MatrixOperator(op_ref[], ws; data_ref = data, callback_refs = (extents,))
 end
 
 """
@@ -293,7 +306,7 @@ function create_matrix_operator_batch(
         op_ref,
     )
 
-    return MatrixOperator(op_ref[], ws; data_ref = data)
+    return MatrixOperator(op_ref[], ws; data_ref = data, callback_refs = (extents,))
 end
 
 """
@@ -377,10 +390,9 @@ mutable struct OperatorTerm
     )
         obj = new(handle, ws, dims, Any[], Any[], Any[])
         finalizer(obj) do x
-            if x.handle != C_NULL
-                cudensitymatDestroyOperatorTerm(x.handle)
-                x.handle = C_NULL
-            end
+            h = x.handle
+            x.handle = C_NULL
+            h != C_NULL && _defer_destroy(x, 3, () -> cudensitymatDestroyOperatorTerm(h))
         end
         return obj
     end
@@ -438,8 +450,9 @@ function append_elementary_product!(
         coefficient_gradient_callback,
     )
 
-    # Keep references
+    # Keep references (the operators, and the argument arrays the library may point into)
     append!(term._elem_op_refs, elem_operators)
+    push!(term._callback_refs, (handles, modes, duality))
     return nothing
 end
 
@@ -493,7 +506,10 @@ function append_elementary_product_batch!(
     )
 
     append!(term._elem_op_refs, elem_operators)
-    push!(term._callback_refs, (static_coefficients, total_coefficients))
+    push!(
+        term._callback_refs,
+        (static_coefficients, total_coefficients, handles, modes, duality),
+    )
     return nothing
 end
 
@@ -535,6 +551,7 @@ function append_matrix_product!(
     )
 
     append!(term._matrix_op_refs, matrix_operators)
+    push!(term._callback_refs, (handles, conj, dual))
     return nothing
 end
 
@@ -568,10 +585,9 @@ mutable struct Operator
     function Operator(handle::cudensitymatOperator_t, ws::WorkStream, dims::Vector{Int64})
         obj = new(handle, ws, dims, Any[], false)
         finalizer(obj) do x
-            if x.handle != C_NULL
-                cudensitymatDestroyOperator(x.handle)
-                x.handle = C_NULL
-            end
+            h = x.handle
+            x.handle = C_NULL
+            h != C_NULL && _defer_destroy(x, 2, () -> cudensitymatDestroyOperator(h))
         end
         return obj
     end
@@ -695,18 +711,19 @@ mutable struct OperatorAction
     handle::cudensitymatOperatorAction_t
     ws::WorkStream
     _operator_refs::Vector{Operator}
+    _meta::Any   # argument arrays passed by pointer at creation
 
     function OperatorAction(
         handle::cudensitymatOperatorAction_t,
         ws::WorkStream,
-        operators::Vector{Operator},
+        operators::Vector{Operator};
+        meta = nothing,
     )
-        obj = new(handle, ws, operators)
+        obj = new(handle, ws, operators, meta)
         finalizer(obj) do x
-            if x.handle != C_NULL
-                cudensitymatDestroyOperatorAction(x.handle)
-                x.handle = C_NULL
-            end
+            h = x.handle
+            x.handle = C_NULL
+            h != C_NULL && _defer_destroy(x, 1, () -> cudensitymatDestroyOperatorAction(h))
         end
         return obj
     end
@@ -752,7 +769,7 @@ function create_operator_action(
         approach,
         action_ref,
     )
-    return OperatorAction(action_ref[], ws, operators)
+    return OperatorAction(action_ref[], ws, operators; meta = handles)
 end
 
 """
