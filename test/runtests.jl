@@ -48,6 +48,9 @@ HAS_GPU || @warn "Skipping cuDensityMat GPU tests: $GPU_SKIP_REASON"
         # Phase 10: Integration test — full Lindblad simulation
         include("densitymat/test_integration.jl")
 
+        # Lindbladian builder + batched RK4 + stiffness helpers
+        include("densitymat/test_lindblad.jl")
+
     end
 end
 
