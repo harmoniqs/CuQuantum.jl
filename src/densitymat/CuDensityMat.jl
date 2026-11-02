@@ -18,6 +18,11 @@ using CUDACore: R_32F, R_64F, C_32F, C_64F, cuDoubleComplex
 
 using CEnum: @cenum
 
+# Host-side Lindbladian references (lindblad.jl); qualified use only — this module
+# defines its own `norm`/`trace` for states.
+using LinearAlgebra: LinearAlgebra
+using SparseArrays: SparseArrays
+
 const _local_toolkit = CUDACore.local_toolkit
 if _local_toolkit
     using CUDA_Runtime_Discovery
@@ -66,6 +71,12 @@ include("expectation.jl")
 
 # Eigenspectrum solver
 include("spectrum.jl")
+
+# Lindbladian builder (spec → plan → multidiagonal cuDensityMat Operator; host references)
+include("lindblad.jl")
+
+# Batched fixed-step integrators (RK4) and stiffness helpers
+include("integrators.jl")
 
 # --- Handle management ---
 
