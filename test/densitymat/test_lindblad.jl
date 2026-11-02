@@ -91,7 +91,8 @@ include(joinpath(@__DIR__, "lindblad_models.jl"))
     end
 
     @testset "RK4: order 4 and exp(Lt)" begin
-        spec, P = two_mode_model(4; g = 0.35, shift = 1.0, rate1 = 0.05, dephase = 0.02, K = 0.1)
+        spec, P =
+            two_mode_model(4; g = 0.35, shift = 1.0, rate1 = 0.05, dephase = 0.02, K = 0.1)
         n = 16
         S = lindblad_superoperator(spec, 0.0, P[:, 1])
         L = CpuLindbladian(spec; batch_size = 1, num_params = 1)
@@ -108,7 +109,8 @@ include(joinpath(@__DIR__, "lindblad_models.jl"))
         @test !(err(25) < 1e-10)          # negative control: a coarse run is visibly off
 
         # time-dependent coefficient (g(t) = g0 cos(ω t) via the batched callback path)
-        spec_t, Pt = two_mode_model(4; g = (t, p) -> p[1] * cos(3t), shift = 1.0, rate1 = 0.05)
+        spec_t, Pt =
+            two_mode_model(4; g = (t, p) -> p[1] * cos(3t), shift = 1.0, rate1 = 0.05)
         Lt = CpuLindbladian(spec_t; batch_size = 1, num_params = 1)
         reft = lindblad_rk4!(Lt, copy(x0), 0.0, T; nsteps = 6400, params = Pt)
         et = [
@@ -119,7 +121,8 @@ include(joinpath(@__DIR__, "lindblad_models.jl"))
     end
 
     @testset "RK4: trace drift over many steps" begin
-        spec, P = two_mode_model(4; g = 0.35, shift = 1.0, rate1 = 0.05, dephase = 0.02, K = 0.1)
+        spec, P =
+            two_mode_model(4; g = 0.35, shift = 1.0, rate1 = 0.05, dephase = 0.02, K = 0.1)
         L = CpuLindbladian(spec; batch_size = 2, num_params = 1)
         P2 = hcat(P, 2P)
         x = random_states(16, 2; seed = 5, hermitian = true, unit_trace = true)
@@ -302,7 +305,8 @@ include(joinpath(@__DIR__, "lindblad_models.jl"))
 
     @gpu_test "GPU RK4 == host RK4, exp(Lt), order 4, trace" begin
         ws = WorkStream()
-        spec, P = two_mode_model(4; g = 0.35, shift = 1.0, rate1 = 0.05, dephase = 0.02, K = 0.1)
+        spec, P =
+            two_mode_model(4; g = 0.35, shift = 1.0, rate1 = 0.05, dephase = 0.02, K = 0.1)
         n = 16
         S = lindblad_superoperator(spec, 0.0, P[:, 1])
         x0 = random_states(n, 1; seed = 11, hermitian = true, unit_trace = true)
